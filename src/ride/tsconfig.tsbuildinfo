@@ -1,0 +1,1 @@
+{"root":["./src/server.ts","./src/controller/ride.controller.ts","./src/db/db.ts","./src/middleware/auth.middleware.ts","./src/models/ride.model.ts","./src/routes/ride.routes.ts","./src/service/rabbit.ts"],"version":"5.8.3"}

@@ -60,7 +60,7 @@ export const acceptRide = async (
     }
 
     const ride = await rideModel.findOneAndUpdate(
-      { _id: rideId, status: "pending" },
+      { _id: rideId, status: "requested" },
       { status: "accepted", captain: new Types.ObjectId(req.captain._id) },
       { new: true }
     );

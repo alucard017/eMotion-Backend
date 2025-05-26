@@ -6,8 +6,7 @@ import blacklisttokenModel from "../models/blacklisttoken.model";
 import rabbitMq from "../service/rabbit";
 import axios from "axios";
 const { subscribeToQueue } = rabbitMq;
-const RIDE_SERVICE_URL =
-  process.env.RIDE_SERVICE_URL || "http://localhost:4000";
+const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
 
 interface CaptainRequest extends Request {
   captain?: any;
@@ -209,7 +208,7 @@ export const getAllRideRequests = async (
   try {
     const token =
       req.cookies?.token || req.headers?.authorization?.split(" ")[1];
-    const response = await axios.get(`${RIDE_SERVICE_URL}/api/rides`, {
+    const response = await axios.get(`${BASE_URL}/api/rides`, {
       params: { status: "requested" },
       withCredentials: true,
       headers: {

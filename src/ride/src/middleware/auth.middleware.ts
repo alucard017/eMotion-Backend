@@ -27,7 +27,7 @@ export const userAuth = async (
     }
 
     const response = await axios.get(
-      `${process.env.USER_URL}/api/user/profile`,
+      `${process.env.BASE_URL}/api/user/profile`,
       {
         withCredentials: true,
         headers: {
@@ -74,7 +74,7 @@ export const captainAuth = async (
     }
 
     const response = await axios.get(
-      `${process.env.CAPTAIN_URL}/api/captain/profile`,
+      `${process.env.BASE_URL}/api/captain/profile`,
       {
         withCredentials: true,
         headers: {

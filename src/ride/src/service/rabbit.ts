@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 const RABBITMQ_URL = process.env.RABBIT_URL as string;
 
-let connection: Connection | null = null;
+let connection: any = null;
 let channel: Channel | null = null;
 let connecting: Promise<void> | null = null;
 
@@ -38,7 +38,7 @@ async function connect(): Promise<void> {
       connection = null;
       channel = null;
     });
-    connection.on("error", (err) => {
+    connection.on("error", (err: any) => {
       console.error("RabbitMQ connection error", err);
       connection = null;
       channel = null;

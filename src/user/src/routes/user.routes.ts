@@ -6,9 +6,9 @@ const router = express.Router();
 
 router.post("/register", userController.register);
 router.post("/login", userController.login);
-router.post("/logout", userController.logout);
+router.post("/logout", userAuth, userController.logout);
 router.get("/profile", userAuth, userController.profile);
 router.post("/profile", userAuth, userController.updateProfile);
 router.get("/accepted-ride", userAuth, userController.acceptedRide);
-
+router.get("/get-captains", userAuth, userController.availableCaptains);
 export default router;

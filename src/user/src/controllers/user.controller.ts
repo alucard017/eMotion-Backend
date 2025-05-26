@@ -27,6 +27,7 @@ export const register = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`User register invoked`);
     const { name, email, phone, password } = req.body;
     const user = await userModel.findOne({ email });
 
@@ -63,6 +64,7 @@ export const register = async (
 
 export const login = async (req: UserRequest, res: Response): Promise<void> => {
   try {
+    console.log(`User login invoked`);
     const { email, password } = req.body;
     const user = await userModel.findOne({ email }).select("+password");
 
@@ -93,6 +95,7 @@ export const logout = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`User logout invoked`);
     const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
     await blacklisttokenModel.create({ token });
     res.clearCookie("token");
@@ -107,6 +110,7 @@ export const profile = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`User profile GET invoked`);
     res.send(req.user);
   } catch (error) {
     res.status(500).json({ message: "Error while fetching profile" });
@@ -117,6 +121,7 @@ export const updateProfile = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`User profile POST invoked`);
     const { name, email, phone } = req.body;
     const user = await userModel.findById(req.user._id);
 
@@ -142,10 +147,38 @@ export const updateProfile = async (
     res.status(500).json({ message: error.message });
   }
 };
+
+export const availableCaptains = async (
+  req: UserRequest,
+  res: Response
+): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${process.env.BASE_URL}/api/captain/get-captains`
+    );
+    if (!response.ok) {
+      throw new Error("Captain service unavailable");
+    }
+
+    const data = await response.json();
+    res.status(200).json({ captains: data });
+  } catch (error) {
+    console.error("Error fetching captains:", error);
+    res.status(503).json({ message: "Unable to fetch captains" });
+  }
+};
+
 export const acceptedRide = async (
   req: UserRequest,
   res: Response
 ): Promise<void> => {
+  console.log(`User acceptedRide invoked`);
   const userId = req.user?.id;
   if (!userId) {
     res.status(401).json({ message: "Unauthorized" });
@@ -159,7 +192,7 @@ export const acceptedRide = async (
     if (!responded) {
       responded = true;
       clearTimeout(timeout);
-      res.send(data);
+      res.send({ ride: data });
     }
   };
 

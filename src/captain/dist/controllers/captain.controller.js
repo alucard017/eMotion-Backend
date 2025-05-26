@@ -23,7 +23,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllRideRequests = exports.waitForNewRide = exports.toggleAvailability = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
+exports.getAllRideRequests = exports.waitForNewRide = exports.getAvailableCaptains = exports.toggleAvailability = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const captain_model_1 = __importDefault(require("../models/captain.model"));
@@ -35,6 +35,7 @@ const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
 const pendingRequests = new Map();
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`Captain Register Invoked`);
         const { name, email, phone, vehicle, password } = req.body;
         const existingCaptain = yield captain_model_1.default.findOne({ email });
         if (existingCaptain) {
@@ -67,6 +68,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.register = register;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`Captain Login Invoked`);
         const { email, password } = req.body;
         if (!email || !password) {
             res.status(404).json({ message: "Both fields are required" });
@@ -93,12 +95,19 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 });
 exports.login = login;
 const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
     try {
+        console.log(`Captain Logout Invoked`);
         const token = req.cookies.token || ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1]);
+        console.log(req.captain);
+        const captainId = (_b = req.captain) === null || _b === void 0 ? void 0 : _b.id;
+        if (captainId) {
+            yield captain_model_1.default.findByIdAndUpdate(captainId, { isAvailable: false });
+            console.log(`LOGOUT isavailable set false`);
+        }
         yield blacklisttoken_model_1.default.create({ token });
         res.clearCookie("token");
-        res.send({ message: "Captain logged out successfully" });
+        res.send({ message: "Captain logged out successfully and set offline" });
     }
     catch (error) {
         res.status(500).json({ message: error.message });
@@ -107,6 +116,7 @@ const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.logout = logout;
 const profile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`Captain Profile GET Invoked`);
         res.send(req.captain);
     }
     catch (error) {
@@ -116,6 +126,7 @@ const profile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.profile = profile;
 const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`Captain Profile POST Invoked`);
         const { name, email, phone, vehicle } = req.body;
         const captain = yield captain_model_1.default.findById(req.captain._id);
         if (!captain) {
@@ -145,6 +156,7 @@ const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
 exports.updateProfile = updateProfile;
 const toggleAvailability = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`Captain Toggle Availability Invoked`);
         const captain = yield captain_model_1.default.findById(req.captain._id);
         if (!captain) {
             res.status(404).json({ message: "Captain not found" });
@@ -159,8 +171,22 @@ const toggleAvailability = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.toggleAvailability = toggleAvailability;
+const getAvailableCaptains = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log(`Captain getAvailableCaptains invoked`);
+    try {
+        const captains = yield captain_model_1.default.find({ isAvailable: true }).select("-password" // exclude password
+        );
+        res.status(200).json(captains);
+    }
+    catch (error) {
+        console.error("Error fetching available captains:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.getAvailableCaptains = getAvailableCaptains;
 const waitForNewRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
+    console.log(`Captain Wait For new Ride invoked`);
     const captainId = String((_a = req.captain) === null || _a === void 0 ? void 0 : _a._id);
     // Clear previous pending request if exists (optional)
     const previous = pendingRequests.get(captainId);
@@ -187,8 +213,9 @@ exports.waitForNewRide = waitForNewRide;
 const getAllRideRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     try {
+        console.log(`Captain GetAllRideRequests invoked`);
         const token = ((_a = req.cookies) === null || _a === void 0 ? void 0 : _a.token) || ((_c = (_b = req.headers) === null || _b === void 0 ? void 0 : _b.authorization) === null || _c === void 0 ? void 0 : _c.split(" ")[1]);
-        const response = yield axios_1.default.get(`${BASE_URL}/api/rides`, {
+        const response = yield axios_1.default.get(`${BASE_URL}/api/ride/rides`, {
             params: { status: "requested" },
             withCredentials: true,
             headers: {

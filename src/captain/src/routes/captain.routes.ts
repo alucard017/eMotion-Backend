@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.post("/register", captainController.register);
 router.post("/login", captainController.login);
-router.post("/logout", captainController.logout);
+router.post("/logout", captainAuth, captainController.logout);
 router.post("/profile", captainAuth, captainController.updateProfile);
 router.get("/profile", captainAuth, captainController.profile);
 router.post(
@@ -14,6 +14,8 @@ router.post(
   captainAuth,
   captainController.toggleAvailability
 );
+router.get("/get-captains", captainController.getAvailableCaptains);
 router.get("/new-ride", captainAuth, captainController.waitForNewRide);
 router.get("/ride-requests", captainAuth, captainController.getAllRideRequests);
+router.get("/ride-history", captainAuth, captainController.getRideHistory);
 export default router;

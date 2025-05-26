@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import connect from "./db/db";
 import captainRoutes from "./routes/captain.routes";
 import rabbitMq from "./service/rabbit";
+import cors from "cors";
 
 dotenv.config();
 const app = express();
@@ -14,10 +15,15 @@ rabbitMq.connect();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
+app.use(
+  cors({
+    origin: "http://localhost:3001",
+    credentials: true,
+  })
+);
 app.use("/", captainRoutes);
 
 const server = http.createServer(app);
-server.listen(3002, () => {
-  console.log("captain service is running on port 3002");
+server.listen(8002, () => {
+  console.log("captain service is running on port 8002");
 });

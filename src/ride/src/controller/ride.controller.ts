@@ -16,7 +16,8 @@ export const createRide = async (
   next: NextFunction
 ) => {
   try {
-    const { pickup, destination } = req.body;
+    console.log(`Ride createRide invoked`);
+    const { pickup, destination, fare } = req.body;
 
     if (!req.user?._id) {
       res.status(401).json({ message: "Unauthorized: User not found" });
@@ -27,6 +28,7 @@ export const createRide = async (
       user: req.user._id,
       pickup,
       destination,
+      fare,
       status: "requested",
     });
 
@@ -47,6 +49,7 @@ export const acceptRide = async (
   next: NextFunction
 ) => {
   try {
+    console.log(`Ride acceptRide invoked.`);
     const rideId = req.body.rideId as string;
 
     if (!rideId) {
@@ -79,6 +82,7 @@ export const acceptRide = async (
 
 export const cancelRide = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    console.log(`Ride cancelRide invoked`);
     const { rideId } = req.body;
 
     if (!req.user?._id) {
@@ -100,7 +104,7 @@ export const cancelRide = async (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
-    await ride.deleteOne();
+    await rideModel.findByIdAndDelete(rideId);
 
     res.status(200).json({ message: "Ride cancelled successfully" });
   } catch (err: any) {
@@ -110,6 +114,7 @@ export const cancelRide = async (req: AuthenticatedRequest, res: Response) => {
 
 export const getRides = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    console.log(`Ride getRides invoked`);
     if (!req.captain?._id) {
       res.status(401).json({ message: "Unauthorized: Captain not found" });
       return;

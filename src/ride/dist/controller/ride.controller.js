@@ -20,6 +20,7 @@ const { publishToQueue } = rabbit_1.default;
 const createRide = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log(`Ride createRide invoked`);
         const { pickup, destination } = req.body;
         if (!((_a = req.user) === null || _a === void 0 ? void 0 : _a._id)) {
             res.status(401).json({ message: "Unauthorized: User not found" });
@@ -44,6 +45,7 @@ exports.createRide = createRide;
 const acceptRide = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log(`Ride acceptRide invoked.`);
         const rideId = req.body.rideId;
         if (!rideId) {
             res.status(400).json({ message: "Ride ID is required" });
@@ -69,6 +71,7 @@ exports.acceptRide = acceptRide;
 const cancelRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log(`Ride cancelRide invoked`);
         const { rideId } = req.body;
         if (!((_a = req.user) === null || _a === void 0 ? void 0 : _a._id)) {
             res.status(401).json({ message: "Unauthorized: User not found" });
@@ -85,7 +88,7 @@ const cancelRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 .json({ message: "You are not allowed to cancel this ride" });
             return;
         }
-        yield ride.deleteOne();
+        yield ride_model_1.default.findByIdAndDelete(rideId);
         res.status(200).json({ message: "Ride cancelled successfully" });
     }
     catch (err) {
@@ -96,6 +99,7 @@ exports.cancelRide = cancelRide;
 const getRides = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log(`Ride getRides invoked`);
         if (!((_a = req.captain) === null || _a === void 0 ? void 0 : _a._id)) {
             res.status(401).json({ message: "Unauthorized: Captain not found" });
             return;

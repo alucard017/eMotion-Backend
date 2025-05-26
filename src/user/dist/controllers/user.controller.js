@@ -23,7 +23,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.acceptedRide = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
+exports.acceptedRide = exports.availableCaptains = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const user_model_1 = __importDefault(require("../models/user.model"));
@@ -42,6 +42,7 @@ const rideEventEmitter = new events_1.EventEmitter();
 // }
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`User register invoked`);
         const { name, email, phone, password } = req.body;
         const user = yield user_model_1.default.findOne({ email });
         if (user) {
@@ -70,6 +71,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.register = register;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`User login invoked`);
         const { email, password } = req.body;
         const user = yield user_model_1.default.findOne({ email }).select("+password");
         if (!user || !(yield bcrypt_1.default.compare(password, user.password))) {
@@ -96,6 +98,7 @@ exports.login = login;
 const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log(`User logout invoked`);
         const token = req.cookies.token || ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1]);
         yield blacklisttoken_model_1.default.create({ token });
         res.clearCookie("token");
@@ -108,6 +111,7 @@ const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.logout = logout;
 const profile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`User profile GET invoked`);
         res.send(req.user);
     }
     catch (error) {
@@ -117,6 +121,7 @@ const profile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.profile = profile;
 const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log(`User profile POST invoked`);
         const { name, email, phone } = req.body;
         const user = yield user_model_1.default.findById(req.user._id);
         if (!user) {
@@ -142,8 +147,30 @@ const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.updateProfile = updateProfile;
+const availableCaptains = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    if (!userId) {
+        res.status(401).json({ message: "Unauthorized" });
+        return;
+    }
+    try {
+        const response = yield fetch(`${process.env.BASE_URL}/api/captain/get-captains`);
+        if (!response.ok) {
+            throw new Error("Captain service unavailable");
+        }
+        const data = yield response.json();
+        res.status(200).json({ captains: data });
+    }
+    catch (error) {
+        console.error("Error fetching captains:", error);
+        res.status(503).json({ message: "Unable to fetch captains" });
+    }
+});
+exports.availableCaptains = availableCaptains;
 const acceptedRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
+    console.log(`User acceptedRide invoked`);
     const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
     if (!userId) {
         res.status(401).json({ message: "Unauthorized" });
@@ -155,7 +182,7 @@ const acceptedRide = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         if (!responded) {
             responded = true;
             clearTimeout(timeout);
-            res.send(data);
+            res.send({ ride: data });
         }
     };
     const timeout = setTimeout(() => {

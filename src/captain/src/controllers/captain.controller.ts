@@ -19,6 +19,7 @@ export const register = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`Captain Register Invoked`);
     const { name, email, phone, vehicle, password } = req.body;
     const existingCaptain = await captainModel.findOne({ email });
 
@@ -64,6 +65,7 @@ export const login = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`Captain Login Invoked`);
     const { email, password } = req.body;
     if (!email || !password) {
       res.status(404).json({ message: "Both fields are required" });
@@ -102,10 +104,19 @@ export const logout = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`Captain Logout Invoked`);
     const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+    // console.log(req.captain);
+    const captainId = req.captain?._id;
+    if (captainId) {
+      await captainModel.findByIdAndUpdate(captainId, { isAvailable: false });
+      // console.log(`LOGOUT isavailable set false`);
+    }
     await blacklisttokenModel.create({ token });
+
     res.clearCookie("token");
-    res.send({ message: "Captain logged out successfully" });
+
+    res.send({ message: "Captain logged out successfully and set offline" });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -116,6 +127,7 @@ export const profile = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`Captain Profile GET Invoked`);
     res.send(req.captain);
   } catch (error: any) {
     res.status(500).json({ message: "Error while fetching profile" });
@@ -127,6 +139,7 @@ export const updateProfile = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`Captain Profile POST Invoked`);
     const { name, email, phone, vehicle } = req.body;
     const captain = await captainModel.findById(req.captain._id);
 
@@ -159,6 +172,7 @@ export const toggleAvailability = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log(`Captain Toggle Availability Invoked`);
     const captain = await captainModel.findById(req.captain._id);
     if (!captain) {
       res.status(404).json({ message: "Captain not found" });
@@ -173,7 +187,26 @@ export const toggleAvailability = async (
   }
 };
 
+export const getAvailableCaptains = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  console.log(`Captain getAvailableCaptains invoked`);
+
+  try {
+    const captains = await captainModel.find({ isAvailable: true }).select(
+      "-password" // exclude password
+    );
+
+    res.status(200).json(captains);
+  } catch (error) {
+    console.error("Error fetching available captains:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export const waitForNewRide = async (req: CaptainRequest, res: Response) => {
+  console.log(`Captain Wait For new Ride invoked`);
   const captainId = String(req.captain?._id);
 
   // Clear previous pending request if exists (optional)
@@ -206,9 +239,10 @@ export const getAllRideRequests = async (
   res: Response
 ) => {
   try {
+    console.log(`Captain GetAllRideRequests invoked`);
     const token =
       req.cookies?.token || req.headers?.authorization?.split(" ")[1];
-    const response = await axios.get(`${BASE_URL}/api/rides`, {
+    const response = await axios.get(`${BASE_URL}/api/ride/rides`, {
       params: { status: "requested" },
       withCredentials: true,
       headers: {

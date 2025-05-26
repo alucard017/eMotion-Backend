@@ -10,15 +10,20 @@ const db_1 = __importDefault(require("./db/db"));
 const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const rabbit_1 = __importDefault(require("./service/rabbit"));
+const cors_1 = __importDefault(require("cors"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 (0, db_1.default)();
 rabbit_1.default.connect();
+app.use((0, cors_1.default)({
+    origin: "http://localhost:3001",
+    credentials: true,
+}));
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, cookie_parser_1.default)());
-app.use('/', user_routes_1.default);
+app.use("/", user_routes_1.default);
 const server = http_1.default.createServer(app);
-server.listen(3001, () => {
-    console.log('User service is running on port 3001');
+server.listen(8001, () => {
+    console.log("User service is running on port 8001");
 });

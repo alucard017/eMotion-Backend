@@ -1,11 +1,11 @@
-import http from 'http';
-import express, { Application } from 'express';
-import dotenv from 'dotenv';
-import connect from './db/db';
-import userRoutes from './routes/user.routes';
-import cookieParser from 'cookie-parser';
-import rabbitMq from './service/rabbit';
-
+import http from "http";
+import express, { Application } from "express";
+import dotenv from "dotenv";
+import connect from "./db/db";
+import userRoutes from "./routes/user.routes";
+import cookieParser from "cookie-parser";
+import rabbitMq from "./service/rabbit";
+import cors from "cors";
 dotenv.config();
 
 const app: Application = express();
@@ -13,14 +13,21 @@ const app: Application = express();
 connect();
 rabbitMq.connect();
 
+app.use(
+  cors({
+    origin: "http://localhost:3001",
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use('/', userRoutes);
+app.use("/", userRoutes);
 
 const server = http.createServer(app);
 
-server.listen(3001, () => {
-    console.log('User service is running on port 3001');
+server.listen(8001, () => {
+  console.log("User service is running on port 8001");
 });

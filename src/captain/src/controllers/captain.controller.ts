@@ -5,9 +5,10 @@ import captainModel from "../models/captain.model";
 import blacklisttokenModel from "../models/blacklisttoken.model";
 import rabbitMq from "../service/rabbit";
 import axios from "axios";
+import { EventEmitter } from "events";
 const { subscribeToQueue } = rabbitMq;
-const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
-
+const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
+const rideEventEmitter = new EventEmitter();
 interface CaptainRequest extends Request {
   captain?: any;
 }
@@ -181,7 +182,7 @@ export const toggleAvailability = async (
 
     captain.isAvailable = !captain.isAvailable;
     await captain.save();
-    res.send(captain);
+    res.json({ isAvailable: captain.isAvailable });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -205,33 +206,73 @@ export const getAvailableCaptains = async (
   }
 };
 
-export const waitForNewRide = async (req: CaptainRequest, res: Response) => {
-  console.log(`Captain Wait For new Ride invoked`);
+export const waitForRideEvent = async (
+  req: CaptainRequest,
+  res: Response
+): Promise<void> => {
   const captainId = String(req.captain?._id);
-
-  // Clear previous pending request if exists (optional)
-  const previous = pendingRequests.get(captainId);
-  if (previous && !previous.writableEnded) {
-    previous.status(204).end();
+  if (!captainId) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
   }
 
-  pendingRequests.set(captainId, res);
+  const eventType = req.query.event as string;
+  if (!eventType || !["ride-created", "ride-cancelled"].includes(eventType)) {
+    res.status(400).json({ message: "Invalid or missing event type" });
+    return;
+  }
+
+  let responded = false;
+
+  const eventKey1 = `${eventType}-${captainId}`; // assigned events
+  const eventKey2 = `${eventType}-unassigned`; // unassigned events
+
+  const handler = (data: any) => {
+    if (!responded) {
+      responded = true;
+      clearTimeout(timeout);
+      rideEventEmitter.removeListener(eventKey1, handler);
+      rideEventEmitter.removeListener(eventKey2, handler);
+      res.json({ event: eventType, ride: JSON.parse(data) });
+    }
+  };
 
   const timeout = setTimeout(() => {
-    // Only delete if current response is still the same
-    if (pendingRequests.get(captainId) === res) {
-      pendingRequests.delete(captainId);
+    if (!responded) {
+      responded = true;
+      rideEventEmitter.removeListener(eventKey1, handler);
+      rideEventEmitter.removeListener(eventKey2, handler);
       res.status(204).end();
     }
   }, 30000);
 
   res.on("close", () => {
-    clearTimeout(timeout);
-    // Only delete if current response is still the same
-    if (pendingRequests.get(captainId) === res) {
-      pendingRequests.delete(captainId);
+    if (!responded) {
+      responded = true;
+      clearTimeout(timeout);
+      rideEventEmitter.removeListener(eventKey1, handler);
+      rideEventEmitter.removeListener(eventKey2, handler);
     }
   });
+
+  rideEventEmitter.once(eventKey1, handler);
+  rideEventEmitter.once(eventKey2, handler);
+};
+
+export const getCaptainDetails = async (req: CaptainRequest, res: Response) => {
+  try {
+    const captainId = req.params.id || req.query.id;
+    if (!captainId) {
+      res.status(404).send("Captain ID required");
+      return;
+    }
+    const captain = await captainModel.findOne({ captainId });
+    res.send(captain);
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ message: err.message || "Failed to fetch captain details" });
+  }
 };
 
 export const getAllRideRequests = async (
@@ -240,17 +281,7 @@ export const getAllRideRequests = async (
 ) => {
   try {
     console.log(`Captain GetAllRideRequests invoked`);
-    const token =
-      req.cookies?.token || req.headers?.authorization?.split(" ")[1];
-    const response = await axios.get(`${BASE_URL}/api/ride/rides`, {
-      params: { status: "requested" },
-      withCredentials: true,
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    // Assuming ride service responds with { rides: [...] }
+    const response = await axios.get(`${BASE_URL}/api/ride/rides`);
     const rides = response.data.rides;
 
     res.json({ rides });
@@ -261,12 +292,58 @@ export const getAllRideRequests = async (
   }
 };
 
-subscribeToQueue("new-ride", (data: string) => {
+export const getRideHistory = async (
+  req: CaptainRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    console.log(`Captain Ride History Called`);
+    const captainId = req.captain?._id;
+    if (!captainId) {
+      res.status(401).json({ message: "Unauthorized: Captain not found" });
+      return;
+    }
+    const response = await axios.post(
+      `${BASE_URL}/api/ride/ride-history`,
+      {
+        captainId,
+        status: "all", // <-- request body
+      },
+      {
+        withCredentials: true,
+        headers: {
+          Authorization: req.headers.authorization || "",
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log(response);
+    res.json(response.data);
+  } catch (error: any) {
+    console.error("Error fetching captain ride history:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "Failed to fetch ride history" });
+  }
+};
+
+subscribeToQueue("ride-created", (data: string) => {
   const rideData = JSON.parse(data);
   const captainId = rideData.captainId;
-  const res = pendingRequests.get(captainId);
-  if (res) {
-    res.json(rideData);
-    pendingRequests.delete(captainId);
+
+  if (captainId) {
+    // assigned ride event
+    rideEventEmitter.emit(`ride-created-${captainId}`, data);
+  } else {
+    // unassigned ride event for all available captains
+    rideEventEmitter.emit(`ride-created-unassigned`, data);
   }
+});
+
+subscribeToQueue("ride-cancelled", (data: string) => {
+  const rideData = JSON.parse(data);
+  const captainId = rideData.captainId;
+  const eventKey = `ride-cancelled-${captainId}`;
+  rideEventEmitter.emit(eventKey, data);
 });

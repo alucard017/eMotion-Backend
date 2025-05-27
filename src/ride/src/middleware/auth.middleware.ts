@@ -98,3 +98,23 @@ export const captainAuth = async (
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const eitherAuth = async (
+  req: Request & { user?: any; captain?: any },
+  res: Response,
+  next: NextFunction
+) => {
+  userAuth(req, res, (err?: any) => {
+    if (!err && req.user) {
+      return next();
+    }
+    captainAuth(req, res, (err2?: any) => {
+      if (!err2 && req.captain) {
+        return next();
+      }
+      return res
+        .status(401)
+        .json({ message: "Unauthorized: User or Captain required" });
+    });
+  });
+};

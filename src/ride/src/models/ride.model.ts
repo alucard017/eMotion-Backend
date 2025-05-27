@@ -6,7 +6,7 @@ interface IRide extends Document {
   pickup: string;
   destination: string;
   fare: number;
-  status: "requested" | "accepted" | "started" | "completed";
+  status: "requested" | "accepted" | "started" | "completed" | "cancelled";
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date;
@@ -35,8 +35,12 @@ const rideSchema: Schema<IRide> = new Schema(
     },
     status: {
       type: String,
-      enum: ["requested", "accepted", "started", "completed"],
+      enum: ["requested", "accepted", "started", "completed", "cancelled"],
       default: "requested",
+    },
+    completedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

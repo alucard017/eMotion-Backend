@@ -41,7 +41,7 @@ export const captainAuth = async (
     }
 
     req.captain = captain;
-
+    console.log(`Captain is`, req.captain);
     next();
   } catch (error: any) {
     console.error("Captain Auth Middleware error:", error);

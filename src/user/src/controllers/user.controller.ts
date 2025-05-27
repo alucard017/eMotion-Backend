@@ -5,7 +5,8 @@ import userModel from "../models/user.model";
 import blacklisttokenModel from "../models/blacklisttoken.model";
 import rabbitMq from "../service/rabbit";
 import { EventEmitter } from "events";
-
+import axios from "axios";
+const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
 const { subscribeToQueue } = rabbitMq;
 const rideEventEmitter = new EventEmitter();
 
@@ -159,9 +160,7 @@ export const availableCaptains = async (
   }
 
   try {
-    const response = await fetch(
-      `${process.env.BASE_URL}/api/captain/get-captains`
-    );
+    const response = await fetch(`${BASE_URL}/api/captain/get-captains`);
     if (!response.ok) {
       throw new Error("Captain service unavailable");
     }
@@ -174,25 +173,32 @@ export const availableCaptains = async (
   }
 };
 
-export const acceptedRide = async (
+export const rideEventListener = async (
   req: UserRequest,
   res: Response
 ): Promise<void> => {
-  console.log(`User acceptedRide invoked`);
+  console.log(`User rideEventListener invoked`);
+
   const userId = req.user?.id;
   if (!userId) {
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
 
+  const eventType = req.query.event as string;
+  if (!eventType || !["accepted", "started", "completed"].includes(eventType)) {
+    res.status(400).json({ message: "Invalid or missing event type" });
+    return;
+  }
+
   let responded = false;
-  const eventKey = `ride-accepted-${userId}`;
+  const eventKey = `ride-${eventType}-${userId}`;
 
   const handler = (data: any) => {
     if (!responded) {
       responded = true;
       clearTimeout(timeout);
-      res.send({ ride: data });
+      res.send({ ride: data, event: eventType });
     }
   };
 
@@ -215,9 +221,85 @@ export const acceptedRide = async (
   rideEventEmitter.once(eventKey, handler);
 };
 
+export const getUserDetails = async (
+  req: UserRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    console.log(`User getUserDetails Invoked`);
+    const id = req.params?.userId || req.query.userId;
+    if (!id) {
+      res.status(400).send("User ID (_id) required");
+      return;
+    }
+    console.log(`Received user id is: ${id}`);
+    const user = await userModel.findById(id).select("name phone"); // use _id
+    console.log(`fetched data ${user}`);
+    if (!user) {
+      res.status(404).send("User not found");
+      return;
+    }
+
+    res.send(user);
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ message: err.message || "Failed to fetch user details" });
+  }
+};
+
+export const getRideHistory = async (
+  req: UserRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized: User not found" });
+      return;
+    }
+
+    const response = await axios.post(
+      `${BASE_URL}/api/ride/ride-history`,
+      {
+        status: "all",
+        userId,
+      },
+      {
+        withCredentials: true,
+        headers: {
+          Authorization: req.headers.authorization || "",
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    res.json(response.data);
+  } catch (error: any) {
+    console.error("Error fetching user ride history:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "Failed to fetch ride history" });
+  }
+};
+
 subscribeToQueue("ride-accepted", async (msg: string) => {
   const data = JSON.parse(msg);
   const { userId } = data;
   const eventKey = `ride-accepted-${userId}`;
+  rideEventEmitter.emit(eventKey, data);
+});
+
+subscribeToQueue("ride-started", async (msg: string) => {
+  const data = JSON.parse(msg);
+  const { userId } = data;
+  const eventKey = `ride-started-${userId}`;
+  rideEventEmitter.emit(eventKey, data);
+});
+
+subscribeToQueue("ride-completed", async (msg: string) => {
+  const data = JSON.parse(msg);
+  const { userId } = data;
+  const eventKey = `ride-completed-${userId}`;
   rideEventEmitter.emit(eventKey, data);
 });

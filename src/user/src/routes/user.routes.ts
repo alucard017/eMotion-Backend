@@ -7,8 +7,11 @@ const router = express.Router();
 router.post("/register", userController.register);
 router.post("/login", userController.login);
 router.post("/logout", userAuth, userController.logout);
+router.get("/details/:userId", userController.getUserDetails);
 router.get("/profile", userAuth, userController.profile);
 router.post("/profile", userAuth, userController.updateProfile);
-router.get("/accepted-ride", userAuth, userController.acceptedRide);
+router.get("/wait-ride", userAuth, userController.rideEventListener);
 router.get("/get-captains", userAuth, userController.availableCaptains);
+router.get("/ride-history", userAuth, userController.getRideHistory);
+
 export default router;

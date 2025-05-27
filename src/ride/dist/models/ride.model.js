@@ -50,12 +50,20 @@ const rideSchema = new mongoose_1.Schema({
         type: String,
         required: true,
     },
+    fare: {
+        type: Number,
+        required: true,
+    },
     status: {
         type: String,
-        enum: ['requested', 'accepted', 'started', 'completed'],
-        default: 'requested',
+        enum: ["requested", "accepted", "started", "completed", "cancelled"],
+        default: "requested",
+    },
+    completedAt: {
+        type: Date,
+        default: null,
     },
 }, {
     timestamps: true,
 });
-exports.default = mongoose_1.default.model('Ride', rideSchema);
+exports.default = mongoose_1.default.model("Ride", rideSchema);

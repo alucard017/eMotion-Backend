@@ -43,6 +43,7 @@ const captainAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             return;
         }
         req.captain = captain;
+        console.log(`Captain is`, req.captain);
         next();
     }
     catch (error) {

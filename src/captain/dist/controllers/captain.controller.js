@@ -23,15 +23,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllRideRequests = exports.waitForNewRide = exports.getAvailableCaptains = exports.toggleAvailability = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
+exports.getRideHistory = exports.getAllRideRequests = exports.getCaptainDetails = exports.waitForRideEvent = exports.getAvailableCaptains = exports.toggleAvailability = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const captain_model_1 = __importDefault(require("../models/captain.model"));
 const blacklisttoken_model_1 = __importDefault(require("../models/blacklisttoken.model"));
 const rabbit_1 = __importDefault(require("../service/rabbit"));
 const axios_1 = __importDefault(require("axios"));
+const events_1 = require("events");
 const { subscribeToQueue } = rabbit_1.default;
-const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
+const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
+const rideEventEmitter = new events_1.EventEmitter();
 const pendingRequests = new Map();
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -99,11 +101,11 @@ const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log(`Captain Logout Invoked`);
         const token = req.cookies.token || ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1]);
-        console.log(req.captain);
-        const captainId = (_b = req.captain) === null || _b === void 0 ? void 0 : _b.id;
+        // console.log(req.captain);
+        const captainId = (_b = req.captain) === null || _b === void 0 ? void 0 : _b._id;
         if (captainId) {
             yield captain_model_1.default.findByIdAndUpdate(captainId, { isAvailable: false });
-            console.log(`LOGOUT isavailable set false`);
+            // console.log(`LOGOUT isavailable set false`);
         }
         yield blacklisttoken_model_1.default.create({ token });
         res.clearCookie("token");
@@ -164,7 +166,7 @@ const toggleAvailability = (req, res) => __awaiter(void 0, void 0, void 0, funct
         }
         captain.isAvailable = !captain.isAvailable;
         yield captain.save();
-        res.send(captain);
+        res.json({ isAvailable: captain.isAvailable });
     }
     catch (error) {
         res.status(500).json({ message: error.message });
@@ -184,45 +186,71 @@ const getAvailableCaptains = (req, res) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.getAvailableCaptains = getAvailableCaptains;
-const waitForNewRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const waitForRideEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    console.log(`Captain Wait For new Ride invoked`);
     const captainId = String((_a = req.captain) === null || _a === void 0 ? void 0 : _a._id);
-    // Clear previous pending request if exists (optional)
-    const previous = pendingRequests.get(captainId);
-    if (previous && !previous.writableEnded) {
-        previous.status(204).end();
+    if (!captainId) {
+        res.status(401).json({ message: "Unauthorized" });
+        return;
     }
-    pendingRequests.set(captainId, res);
+    const eventType = req.query.event;
+    if (!eventType || !["ride-created", "ride-cancelled"].includes(eventType)) {
+        res.status(400).json({ message: "Invalid or missing event type" });
+        return;
+    }
+    let responded = false;
+    const eventKey1 = `${eventType}-${captainId}`; // assigned events
+    const eventKey2 = `${eventType}-unassigned`; // unassigned events
+    const handler = (data) => {
+        if (!responded) {
+            responded = true;
+            clearTimeout(timeout);
+            rideEventEmitter.removeListener(eventKey1, handler);
+            rideEventEmitter.removeListener(eventKey2, handler);
+            res.json({ event: eventType, ride: JSON.parse(data) });
+        }
+    };
     const timeout = setTimeout(() => {
-        // Only delete if current response is still the same
-        if (pendingRequests.get(captainId) === res) {
-            pendingRequests.delete(captainId);
+        if (!responded) {
+            responded = true;
+            rideEventEmitter.removeListener(eventKey1, handler);
+            rideEventEmitter.removeListener(eventKey2, handler);
             res.status(204).end();
         }
     }, 30000);
     res.on("close", () => {
-        clearTimeout(timeout);
-        // Only delete if current response is still the same
-        if (pendingRequests.get(captainId) === res) {
-            pendingRequests.delete(captainId);
+        if (!responded) {
+            responded = true;
+            clearTimeout(timeout);
+            rideEventEmitter.removeListener(eventKey1, handler);
+            rideEventEmitter.removeListener(eventKey2, handler);
         }
     });
+    rideEventEmitter.once(eventKey1, handler);
+    rideEventEmitter.once(eventKey2, handler);
 });
-exports.waitForNewRide = waitForNewRide;
+exports.waitForRideEvent = waitForRideEvent;
+const getCaptainDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const captainId = req.params.id || req.query.id;
+        if (!captainId) {
+            res.status(404).send("Captain ID required");
+            return;
+        }
+        const captain = yield captain_model_1.default.findOne({ captainId });
+        res.send(captain);
+    }
+    catch (err) {
+        res
+            .status(500)
+            .json({ message: err.message || "Failed to fetch captain details" });
+    }
+});
+exports.getCaptainDetails = getCaptainDetails;
 const getAllRideRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
     try {
         console.log(`Captain GetAllRideRequests invoked`);
-        const token = ((_a = req.cookies) === null || _a === void 0 ? void 0 : _a.token) || ((_c = (_b = req.headers) === null || _b === void 0 ? void 0 : _b.authorization) === null || _c === void 0 ? void 0 : _c.split(" ")[1]);
-        const response = yield axios_1.default.get(`${BASE_URL}/api/ride/rides`, {
-            params: { status: "requested" },
-            withCredentials: true,
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
-        // Assuming ride service responds with { rides: [...] }
+        const response = yield axios_1.default.get(`${BASE_URL}/api/ride/rides`);
         const rides = response.data.rides;
         res.json({ rides });
     }
@@ -233,12 +261,51 @@ const getAllRideRequests = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.getAllRideRequests = getAllRideRequests;
-subscribeToQueue("new-ride", (data) => {
+const getRideHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        console.log(`Captain Ride History Called`);
+        const captainId = (_a = req.captain) === null || _a === void 0 ? void 0 : _a._id;
+        if (!captainId) {
+            res.status(401).json({ message: "Unauthorized: Captain not found" });
+            return;
+        }
+        const response = yield axios_1.default.post(`${BASE_URL}/api/ride/ride-history`, {
+            captainId,
+            status: "all", // <-- request body
+        }, {
+            withCredentials: true,
+            headers: {
+                Authorization: req.headers.authorization || "",
+                "Content-Type": "application/json",
+            },
+        });
+        console.log(response);
+        res.json(response.data);
+    }
+    catch (error) {
+        console.error("Error fetching captain ride history:", error);
+        res
+            .status(500)
+            .json({ message: error.message || "Failed to fetch ride history" });
+    }
+});
+exports.getRideHistory = getRideHistory;
+subscribeToQueue("ride-created", (data) => {
     const rideData = JSON.parse(data);
     const captainId = rideData.captainId;
-    const res = pendingRequests.get(captainId);
-    if (res) {
-        res.json(rideData);
-        pendingRequests.delete(captainId);
+    if (captainId) {
+        // assigned ride event
+        rideEventEmitter.emit(`ride-created-${captainId}`, data);
     }
+    else {
+        // unassigned ride event for all available captains
+        rideEventEmitter.emit(`ride-created-unassigned`, data);
+    }
+});
+subscribeToQueue("ride-cancelled", (data) => {
+    const rideData = JSON.parse(data);
+    const captainId = rideData.captainId;
+    const eventKey = `ride-cancelled-${captainId}`;
+    rideEventEmitter.emit(eventKey, data);
 });

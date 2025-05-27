@@ -16,7 +16,11 @@ const app = (0, express_1.default)();
 (0, db_1.default)();
 rabbit_1.default.connect();
 app.use((0, cors_1.default)({
-    origin: "http://localhost:3001",
+    origin: [
+        "http://localhost:3001",
+        "http://localhost:8003",
+        "http://localhost:8002",
+    ],
     credentials: true,
 }));
 app.use(express_1.default.json());

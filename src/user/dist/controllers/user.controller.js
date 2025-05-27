@@ -23,13 +23,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.acceptedRide = exports.availableCaptains = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
+exports.getRideHistory = exports.getUserDetails = exports.rideEventListener = exports.availableCaptains = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const user_model_1 = __importDefault(require("../models/user.model"));
 const blacklisttoken_model_1 = __importDefault(require("../models/blacklisttoken.model"));
 const rabbit_1 = __importDefault(require("../service/rabbit"));
 const events_1 = require("events");
+const axios_1 = __importDefault(require("axios"));
+const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
 const { subscribeToQueue } = rabbit_1.default;
 const rideEventEmitter = new events_1.EventEmitter();
 // interface IUser {
@@ -155,7 +157,7 @@ const availableCaptains = (req, res) => __awaiter(void 0, void 0, void 0, functi
         return;
     }
     try {
-        const response = yield fetch(`${process.env.BASE_URL}/api/captain/get-captains`);
+        const response = yield fetch(`${BASE_URL}/api/captain/get-captains`);
         if (!response.ok) {
             throw new Error("Captain service unavailable");
         }
@@ -168,21 +170,26 @@ const availableCaptains = (req, res) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.availableCaptains = availableCaptains;
-const acceptedRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const rideEventListener = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    console.log(`User acceptedRide invoked`);
+    console.log(`User rideEventListener invoked`);
     const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
     if (!userId) {
         res.status(401).json({ message: "Unauthorized" });
         return;
     }
+    const eventType = req.query.event;
+    if (!eventType || !["accepted", "started", "completed"].includes(eventType)) {
+        res.status(400).json({ message: "Invalid or missing event type" });
+        return;
+    }
     let responded = false;
-    const eventKey = `ride-accepted-${userId}`;
+    const eventKey = `ride-${eventType}-${userId}`;
     const handler = (data) => {
         if (!responded) {
             responded = true;
             clearTimeout(timeout);
-            res.send({ ride: data });
+            res.send({ ride: data, event: eventType });
         }
     };
     const timeout = setTimeout(() => {
@@ -201,10 +208,75 @@ const acceptedRide = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     });
     rideEventEmitter.once(eventKey, handler);
 });
-exports.acceptedRide = acceptedRide;
+exports.rideEventListener = rideEventListener;
+const getUserDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        console.log(`User getUserDetails Invoked`);
+        const id = ((_a = req.params) === null || _a === void 0 ? void 0 : _a.userId) || req.query.userId;
+        if (!id) {
+            res.status(400).send("User ID (_id) required");
+            return;
+        }
+        console.log(`Received user id is: ${id}`);
+        const user = yield user_model_1.default.findById(id).select("name phone"); // use _id
+        console.log(`fetched data ${user}`);
+        if (!user) {
+            res.status(404).send("User not found");
+            return;
+        }
+        res.send(user);
+    }
+    catch (err) {
+        res
+            .status(500)
+            .json({ message: err.message || "Failed to fetch user details" });
+    }
+});
+exports.getUserDetails = getUserDetails;
+const getRideHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        if (!userId) {
+            res.status(401).json({ message: "Unauthorized: User not found" });
+            return;
+        }
+        const response = yield axios_1.default.post(`${BASE_URL}/api/ride/ride-history`, {
+            status: "all",
+            userId,
+        }, {
+            withCredentials: true,
+            headers: {
+                Authorization: req.headers.authorization || "",
+                "Content-Type": "application/json",
+            },
+        });
+        res.json(response.data);
+    }
+    catch (error) {
+        console.error("Error fetching user ride history:", error);
+        res
+            .status(500)
+            .json({ message: error.message || "Failed to fetch ride history" });
+    }
+});
+exports.getRideHistory = getRideHistory;
 subscribeToQueue("ride-accepted", (msg) => __awaiter(void 0, void 0, void 0, function* () {
     const data = JSON.parse(msg);
     const { userId } = data;
     const eventKey = `ride-accepted-${userId}`;
+    rideEventEmitter.emit(eventKey, data);
+}));
+subscribeToQueue("ride-started", (msg) => __awaiter(void 0, void 0, void 0, function* () {
+    const data = JSON.parse(msg);
+    const { userId } = data;
+    const eventKey = `ride-started-${userId}`;
+    rideEventEmitter.emit(eventKey, data);
+}));
+subscribeToQueue("ride-completed", (msg) => __awaiter(void 0, void 0, void 0, function* () {
+    const data = JSON.parse(msg);
+    const { userId } = data;
+    const eventKey = `ride-completed-${userId}`;
     rideEventEmitter.emit(eventKey, data);
 }));

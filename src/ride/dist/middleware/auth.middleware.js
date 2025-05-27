@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.captainAuth = exports.userAuth = void 0;
+exports.eitherAuth = exports.captainAuth = exports.userAuth = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const axios_1 = __importDefault(require("axios"));
 const userAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -87,3 +87,19 @@ const captainAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.captainAuth = captainAuth;
+const eitherAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    (0, exports.userAuth)(req, res, (err) => {
+        if (!err && req.user) {
+            return next();
+        }
+        (0, exports.captainAuth)(req, res, (err2) => {
+            if (!err2 && req.captain) {
+                return next();
+            }
+            return res
+                .status(401)
+                .json({ message: "Unauthorized: User or Captain required" });
+        });
+    });
+});
+exports.eitherAuth = eitherAuth;

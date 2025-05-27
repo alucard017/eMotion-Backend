@@ -15,7 +15,8 @@ router.post(
   captainController.toggleAvailability
 );
 router.get("/get-captains", captainController.getAvailableCaptains);
-router.get("/new-ride", captainAuth, captainController.waitForNewRide);
+router.get("/wait-ride", captainAuth, captainController.waitForRideEvent);
 router.get("/ride-requests", captainAuth, captainController.getAllRideRequests);
 router.get("/ride-history", captainAuth, captainController.getRideHistory);
+router.get("/:captainId", captainController.getCaptainDetails);
 export default router;

@@ -14,7 +14,11 @@ rabbitMq.connect();
 
 app.use(
   cors({
-    origin: "http://localhost:3001",
+    origin: [
+      "http://localhost:3001",
+      "http://localhost:8001",
+      "http://localhost:8002",
+    ],
     credentials: true,
   })
 );

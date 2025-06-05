@@ -19,24 +19,27 @@ const userAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
     var _a;
     try {
         const token = req.cookies.token || ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1]);
+        console.log("Extracted token USER:", token);
         if (!token) {
             res.status(401).json({ message: "Unauthorized: Token missing" });
             return;
         }
         let decoded;
         try {
-            decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+            decoded = jsonwebtoken_1.default.verify(token, process.env.USER_SECRET);
         }
         catch (err) {
             res.status(401).json({ message: "Unauthorized: Invalid token" });
             return;
         }
+        console.log("Decoded token USER: ", decoded);
         const response = yield axios_1.default.get(`${process.env.BASE_URL}/api/user/profile`, {
             withCredentials: true,
             headers: {
                 Authorization: `Bearer ${token}`,
             },
         });
+        console.log("USERAuth Response: ", response);
         const user = response.data.user || response.data;
         if (!user) {
             res.status(401).json({ message: "Unauthorized: User not found" });
@@ -54,25 +57,29 @@ exports.userAuth = userAuth;
 const captainAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log("captain auth invoked");
         const token = req.cookies.token || ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1]);
+        console.log("Extracted token Captain:", token);
         if (!token) {
             res.status(401).json({ message: "Unauthorized: Token missing" });
             return;
         }
         let decoded;
         try {
-            decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+            decoded = jsonwebtoken_1.default.verify(token, process.env.CAPTAIN_SECRET);
         }
         catch (err) {
             res.status(401).json({ message: "Unauthorized: Invalid token" });
             return;
         }
+        console.log("Decoded Captain:", decoded);
         const response = yield axios_1.default.get(`${process.env.BASE_URL}/api/captain/profile`, {
             withCredentials: true,
             headers: {
                 Authorization: `Bearer ${token}`,
             },
         });
+        console.log("CaptainAuth Response: ", response);
         const captain = response.data.captain || response.data;
         if (!captain) {
             res.status(401).json({ message: "Unauthorized: Captain not found" });

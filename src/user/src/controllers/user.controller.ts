@@ -4,31 +4,22 @@ import jwt from "jsonwebtoken";
 import userModel from "../models/user.model";
 import blacklisttokenModel from "../models/blacklisttoken.model";
 import rabbitMq from "../service/rabbit";
-import { EventEmitter } from "events";
 import axios from "axios";
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
 const { subscribeToQueue } = rabbitMq;
-const rideEventEmitter = new EventEmitter();
+
+const WEBSOCKET_SERVER_URL = "http://localhost:8080"; // Update if hosted elsewhere
 
 interface UserRequest extends Request {
   user?: any;
 }
-
-// interface IUser {
-//   _id: string;
-//   name: string;
-//   email: string;
-//   phone: number;
-//   password: string;
-//   _doc: any;
-// }
 
 export const register = async (
   req: UserRequest,
   res: Response
 ): Promise<void> => {
   try {
-    console.log(`User register invoked`);
     const { name, email, phone, password } = req.body;
     const user = await userModel.findOne({ email });
 
@@ -65,7 +56,6 @@ export const register = async (
 
 export const login = async (req: UserRequest, res: Response): Promise<void> => {
   try {
-    console.log(`User login invoked`);
     const { email, password } = req.body;
     const user = await userModel.findOne({ email }).select("+password");
 
@@ -96,7 +86,6 @@ export const logout = async (
   res: Response
 ): Promise<void> => {
   try {
-    console.log(`User logout invoked`);
     const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
     await blacklisttokenModel.create({ token });
     res.clearCookie("token");
@@ -111,18 +100,17 @@ export const profile = async (
   res: Response
 ): Promise<void> => {
   try {
-    console.log(`User profile GET invoked`);
     res.send(req.user);
   } catch (error) {
     res.status(500).json({ message: "Error while fetching profile" });
   }
 };
+
 export const updateProfile = async (
   req: UserRequest,
   res: Response
 ): Promise<void> => {
   try {
-    console.log(`User profile POST invoked`);
     const { name, email, phone } = req.body;
     const user = await userModel.findById(req.user._id);
 
@@ -173,73 +161,24 @@ export const availableCaptains = async (
   }
 };
 
-export const rideEventListener = async (
-  req: UserRequest,
-  res: Response
-): Promise<void> => {
-  console.log(`User rideEventListener invoked`);
-
-  const userId = req.user?.id;
-  if (!userId) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
-
-  const eventType = req.query.event as string;
-  if (!eventType || !["accepted", "started", "completed"].includes(eventType)) {
-    res.status(400).json({ message: "Invalid or missing event type" });
-    return;
-  }
-
-  let responded = false;
-  const eventKey = `ride-${eventType}-${userId}`;
-
-  const handler = (data: any) => {
-    if (!responded) {
-      responded = true;
-      clearTimeout(timeout);
-      res.send({ ride: data, event: eventType });
-    }
-  };
-
-  const timeout = setTimeout(() => {
-    if (!responded) {
-      responded = true;
-      rideEventEmitter.removeListener(eventKey, handler);
-      res.status(204).send();
-    }
-  }, 30000);
-
-  res.on("close", () => {
-    if (!responded) {
-      responded = true;
-      clearTimeout(timeout);
-      rideEventEmitter.removeListener(eventKey, handler);
-    }
-  });
-
-  rideEventEmitter.once(eventKey, handler);
-};
-
 export const getUserDetails = async (
   req: UserRequest,
   res: Response
 ): Promise<void> => {
   try {
-    console.log(`User getUserDetails Invoked`);
     const id = req.params?.userId || req.query.userId;
     if (!id) {
       res.status(400).send("User ID (_id) required");
       return;
     }
-    console.log(`Received user id is: ${id}`);
-    const user = await userModel.findById(id).select("name phone"); // use _id
-    console.log(`fetched data ${user}`);
+    console.log(`User id for user details is: `, id);
+    const user = await userModel.findById(id).select("name phone");
     if (!user) {
       res.status(404).send("User not found");
       return;
     }
 
+    console.log(`User details:`, user);
     res.send(user);
   } catch (err: any) {
     res
@@ -283,23 +222,32 @@ export const getRideHistory = async (
   }
 };
 
+const forwardToWebSocket = async (userId: string, event: string, data: any) => {
+  try {
+    await axios.post(`${WEBSOCKET_SERVER_URL}/notify`, {
+      userId,
+      event,
+      data,
+    });
+  } catch (err: any) {
+    console.error("Failed to send WebSocket message:", err.message);
+  }
+};
+
 subscribeToQueue("ride-accepted", async (msg: string) => {
   const data = JSON.parse(msg);
   const { userId } = data;
-  const eventKey = `ride-accepted-${userId}`;
-  rideEventEmitter.emit(eventKey, data);
+  await forwardToWebSocket(userId, "ride-accepted", data);
 });
 
 subscribeToQueue("ride-started", async (msg: string) => {
   const data = JSON.parse(msg);
   const { userId } = data;
-  const eventKey = `ride-started-${userId}`;
-  rideEventEmitter.emit(eventKey, data);
+  await forwardToWebSocket(userId, "ride-started", data);
 });
 
 subscribeToQueue("ride-completed", async (msg: string) => {
   const data = JSON.parse(msg);
   const { userId } = data;
-  const eventKey = `ride-completed-${userId}`;
-  rideEventEmitter.emit(eventKey, data);
+  await forwardToWebSocket(userId, "ride-completed", data);
 });

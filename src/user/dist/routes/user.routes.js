@@ -46,7 +46,6 @@ router.post("/logout", authMiddleWare_1.userAuth, userController.logout);
 router.get("/details/:userId", userController.getUserDetails);
 router.get("/profile", authMiddleWare_1.userAuth, userController.profile);
 router.post("/profile", authMiddleWare_1.userAuth, userController.updateProfile);
-router.get("/wait-ride", authMiddleWare_1.userAuth, userController.rideEventListener);
 router.get("/get-captains", authMiddleWare_1.userAuth, userController.availableCaptains);
 router.get("/ride-history", authMiddleWare_1.userAuth, userController.getRideHistory);
 exports.default = router;

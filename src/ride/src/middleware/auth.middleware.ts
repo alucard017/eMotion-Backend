@@ -14,17 +14,19 @@ export const userAuth = async (
 ): Promise<void> => {
   try {
     const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+    console.log("Extracted token USER:", token);
     if (!token) {
       res.status(401).json({ message: "Unauthorized: Token missing" });
       return;
     }
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+      decoded = jwt.verify(token, process.env.USER_SECRET as string);
     } catch (err) {
       res.status(401).json({ message: "Unauthorized: Invalid token" });
       return;
     }
+    console.log("Decoded token USER: ", decoded);
 
     const response = await axios.get(
       `${process.env.BASE_URL}/api/user/profile`,
@@ -35,7 +37,7 @@ export const userAuth = async (
         },
       }
     );
-
+    console.log("USERAuth Response: ", response);
     const user = response.data.user || response.data;
 
     if (!user) {
@@ -58,8 +60,10 @@ export const captainAuth = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log("captain auth invoked");
     const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
 
+    console.log("Extracted token Captain:", token);
     if (!token) {
       res.status(401).json({ message: "Unauthorized: Token missing" });
       return;
@@ -67,11 +71,12 @@ export const captainAuth = async (
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+      decoded = jwt.verify(token, process.env.CAPTAIN_SECRET as string);
     } catch (err) {
       res.status(401).json({ message: "Unauthorized: Invalid token" });
       return;
     }
+    console.log("Decoded Captain:", decoded);
 
     const response = await axios.get(
       `${process.env.BASE_URL}/api/captain/profile`,
@@ -82,7 +87,7 @@ export const captainAuth = async (
         },
       }
     );
-
+    console.log("CaptainAuth Response: ", response);
     const captain = response.data.captain || response.data;
 
     if (!captain) {

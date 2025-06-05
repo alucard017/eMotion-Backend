@@ -3,8 +3,11 @@ import rideModel from "../models/ride.model";
 import rabbitMq from "../service/rabbit";
 import { Types } from "mongoose";
 import axios from "axios";
+import { notifyUser } from "../service/notification";
+
 const { publishToQueue } = rabbitMq;
 const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
+
 interface AuthenticatedRequest extends Request {
   user?: { _id: string };
   captain?: { _id: string };
@@ -14,9 +17,9 @@ export const createRide = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
-    console.log(`Ride createRide invoked`);
+    console.log(`createRide invoked`);
     const { pickup, destination, fare } = req.body;
 
     if (!req.user?._id) {
@@ -34,6 +37,7 @@ export const createRide = async (
 
     await newRide.save();
     publishToQueue("ride-created", JSON.stringify(newRide));
+    notifyUser(req.user._id, "ride-created", newRide);
 
     res.status(201).send(newRide);
   } catch (error) {
@@ -45,11 +49,12 @@ export const acceptRide = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
-    console.log(`Ride acceptRide invoked.`);
+    console.log("Captain info from request:", req.captain);
+    console.log("Request body: ", req.body);
     const rideId = req.body.rideId as string;
-
+    console.log(`AcceptRide invoked and ride id is: ${rideId}`);
     if (!rideId) {
       res.status(400).json({ message: "Ride ID is required" });
       return;
@@ -66,12 +71,16 @@ export const acceptRide = async (
       { new: true }
     );
 
+    console.log(`Ride is ${ride}`);
     if (!ride) {
       res.status(409).json({ message: "Ride already accepted or unavailable" });
       return;
     }
 
     publishToQueue("ride-accepted", JSON.stringify(ride));
+    notifyUser(ride.user.toString(), "ride-accepted", ride);
+    notifyUser(req.captain._id, "ride-accepted", ride);
+
     res.send(ride);
   } catch (error) {
     next(error);
@@ -82,9 +91,8 @@ export const cancelRide = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
-    console.log("Ride cancelRide invoked.");
     const rideId = req.body.rideId as string;
 
     if (!rideId) {
@@ -113,6 +121,8 @@ export const cancelRide = async (
     }
 
     publishToQueue("ride-cancelled", JSON.stringify(ride));
+    notifyUser(req.user._id, "ride-cancelled", ride);
+
     res.send({ message: "Ride cancelled successfully", ride });
   } catch (error) {
     next(error);
@@ -123,11 +133,11 @@ export const startRide = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
-    console.log("Ride startRide invoked.");
+    console.log("Start ride invoked");
     const rideId = req.body.rideId as string;
-
+    console.log("Ride id from start ride:", rideId);
     if (!rideId) {
       res.status(400).json({ message: "Ride ID is required" });
       return;
@@ -154,20 +164,21 @@ export const startRide = async (
     }
 
     publishToQueue("ride-started", JSON.stringify(ride));
+    notifyUser(ride.user.toString(), "ride-started", ride);
+    notifyUser(req.captain._id, "ride-started", ride);
+
     res.send(ride);
   } catch (error) {
     next(error);
   }
 };
 
-// endRide - invoked by captain service
 export const endRide = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
-    console.log("Ride endRide invoked.");
     const rideId = req.body.rideId as string;
 
     if (!rideId) {
@@ -196,6 +207,9 @@ export const endRide = async (
     }
 
     publishToQueue("ride-completed", JSON.stringify(ride));
+    notifyUser(ride.user.toString(), "ride-completed", ride);
+    notifyUser(req.captain._id, "ride-completed", ride);
+
     res.send(ride);
   } catch (error) {
     next(error);
@@ -203,20 +217,19 @@ export const endRide = async (
 };
 
 export const getUserById = async (userId: any) => {
-  console.log(`Ride getUserById called`);
   const { data } = await axios.get(`${BASE_URL}/api/user/details/${userId}`);
   return { name: data.name, phone: data.phone };
 };
 
 export const getCaptainById = async (captainId: any) => {
-  console.log(`Ride getCaptainById called`);
-  const { data } = await axios.get(`${BASE_URL}/api/captain/${captainId}`);
+  const { data } = await axios.get(
+    `${BASE_URL}/api/captain/details/${captainId}`
+  );
   return { name: data.name, phone: data.phone, vehicle: data.vehicle };
 };
 
 export const getRides = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    console.log(`Ride getRides invoked`);
     const rides = await rideModel.find({
       status: "requested",
     });
@@ -224,15 +237,13 @@ export const getRides = async (req: AuthenticatedRequest, res: Response) => {
     const enrichedRides = await Promise.all(
       rides.map(async (ride) => {
         const userInfo = await getUserById(ride.user.toString());
-        console.log("Fetched user info:", userInfo);
         return {
           ...ride.toObject(),
           user: userInfo,
-          captain: null, // no captain assigned yet
+          captain: null,
         };
       })
     );
-    console.log("enrichedrides: ", enrichedRides);
     res.json({ rides: enrichedRides });
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Failed to fetch rides" });
@@ -244,10 +255,12 @@ export const getRide = async (
   res: Response
 ): Promise<void> => {
   try {
-    // let { status } = req.query;
+    console.log("GetRide invoked");
     let { userId, captainId, status } = req.body;
 
-    // Support 'all' status to fetch all rides regardless of status
+    console.log(
+      `Userid: ${userId}, CaptainId: ${captainId}, Status: ${status}`
+    );
     if (
       status &&
       status !== "all" &&
@@ -284,6 +297,7 @@ export const getRide = async (
 
     const rides = await rideModel.find(query);
 
+    console.log("Rides are : ", rides);
     const enrichedRides = await Promise.all(
       rides.map(async (ride) => {
         const userInfo = ride.user
@@ -301,6 +315,7 @@ export const getRide = async (
       })
     );
 
+    console.log("Enriched Rides are: ", enrichedRides);
     res.json({ rides: enrichedRides });
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Failed to fetch rides" });

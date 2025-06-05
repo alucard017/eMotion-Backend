@@ -8,7 +8,7 @@ import axios from "axios";
 import { EventEmitter } from "events";
 const { subscribeToQueue } = rabbitMq;
 const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
-const rideEventEmitter = new EventEmitter();
+const WEBSOCKET_SERVER_URL = "http://localhost:8080";
 interface CaptainRequest extends Request {
   captain?: any;
 }
@@ -206,58 +206,38 @@ export const getAvailableCaptains = async (
   }
 };
 
-export const waitForRideEvent = async (
-  req: CaptainRequest,
-  res: Response
-): Promise<void> => {
-  const captainId = String(req.captain?._id);
-  if (!captainId) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+const forwardToWebSocket = async (
+  captainId: string,
+  event: string,
+  data: any
+) => {
+  try {
+    await axios.post(`${WEBSOCKET_SERVER_URL}/notify`, {
+      userId: captainId,
+      event,
+      data,
+    });
+  } catch (err: any) {
+    console.error("Failed to send WebSocket message:", err.message);
   }
-
-  const eventType = req.query.event as string;
-  if (!eventType || !["ride-created", "ride-cancelled"].includes(eventType)) {
-    res.status(400).json({ message: "Invalid or missing event type" });
-    return;
-  }
-
-  let responded = false;
-
-  const eventKey1 = `${eventType}-${captainId}`; // assigned events
-  const eventKey2 = `${eventType}-unassigned`; // unassigned events
-
-  const handler = (data: any) => {
-    if (!responded) {
-      responded = true;
-      clearTimeout(timeout);
-      rideEventEmitter.removeListener(eventKey1, handler);
-      rideEventEmitter.removeListener(eventKey2, handler);
-      res.json({ event: eventType, ride: JSON.parse(data) });
-    }
-  };
-
-  const timeout = setTimeout(() => {
-    if (!responded) {
-      responded = true;
-      rideEventEmitter.removeListener(eventKey1, handler);
-      rideEventEmitter.removeListener(eventKey2, handler);
-      res.status(204).end();
-    }
-  }, 30000);
-
-  res.on("close", () => {
-    if (!responded) {
-      responded = true;
-      clearTimeout(timeout);
-      rideEventEmitter.removeListener(eventKey1, handler);
-      rideEventEmitter.removeListener(eventKey2, handler);
-    }
-  });
-
-  rideEventEmitter.once(eventKey1, handler);
-  rideEventEmitter.once(eventKey2, handler);
 };
+
+// RabbitMQ subscriptions
+subscribeToQueue("ride-created", async (msg: string) => {
+  const data = JSON.parse(msg);
+  const { captainId } = data;
+  if (captainId) {
+    await forwardToWebSocket(captainId, "ride-created", data);
+  }
+});
+
+subscribeToQueue("ride-cancelled", async (msg: string) => {
+  const data = JSON.parse(msg);
+  const { captainId } = data;
+  if (captainId) {
+    await forwardToWebSocket(captainId, "ride-cancelled", data);
+  }
+});
 
 export const getCaptainDetails = async (req: CaptainRequest, res: Response) => {
   try {
@@ -266,7 +246,7 @@ export const getCaptainDetails = async (req: CaptainRequest, res: Response) => {
       res.status(404).send("Captain ID required");
       return;
     }
-    const captain = await captainModel.findOne({ captainId });
+    const captain = await captainModel.findById(captainId);
     res.send(captain);
   } catch (err: any) {
     res
@@ -327,23 +307,3 @@ export const getRideHistory = async (
       .json({ message: error.message || "Failed to fetch ride history" });
   }
 };
-
-subscribeToQueue("ride-created", (data: string) => {
-  const rideData = JSON.parse(data);
-  const captainId = rideData.captainId;
-
-  if (captainId) {
-    // assigned ride event
-    rideEventEmitter.emit(`ride-created-${captainId}`, data);
-  } else {
-    // unassigned ride event for all available captains
-    rideEventEmitter.emit(`ride-created-unassigned`, data);
-  }
-});
-
-subscribeToQueue("ride-cancelled", (data: string) => {
-  const rideData = JSON.parse(data);
-  const captainId = rideData.captainId;
-  const eventKey = `ride-cancelled-${captainId}`;
-  rideEventEmitter.emit(eventKey, data);
-});

@@ -47,7 +47,6 @@ router.post("/profile", authMiddleWare_1.captainAuth, captainController.updatePr
 router.get("/profile", authMiddleWare_1.captainAuth, captainController.profile);
 router.post("/toggle-availability", authMiddleWare_1.captainAuth, captainController.toggleAvailability);
 router.get("/get-captains", captainController.getAvailableCaptains);
-router.get("/wait-ride", authMiddleWare_1.captainAuth, captainController.waitForRideEvent);
 router.get("/ride-requests", authMiddleWare_1.captainAuth, captainController.getAllRideRequests);
 router.get("/ride-history", authMiddleWare_1.captainAuth, captainController.getRideHistory);
 router.get("/:captainId", captainController.getCaptainDetails);

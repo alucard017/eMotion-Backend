@@ -23,17 +23,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRideHistory = exports.getAllRideRequests = exports.getCaptainDetails = exports.waitForRideEvent = exports.getAvailableCaptains = exports.toggleAvailability = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
+exports.getRideHistory = exports.getAllRideRequests = exports.getCaptainDetails = exports.getAvailableCaptains = exports.toggleAvailability = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const captain_model_1 = __importDefault(require("../models/captain.model"));
 const blacklisttoken_model_1 = __importDefault(require("../models/blacklisttoken.model"));
 const rabbit_1 = __importDefault(require("../service/rabbit"));
 const axios_1 = __importDefault(require("axios"));
-const events_1 = require("events");
 const { subscribeToQueue } = rabbit_1.default;
 const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
-const rideEventEmitter = new events_1.EventEmitter();
+const WEBSOCKET_SERVER_URL = "http://localhost:8080";
 const pendingRequests = new Map();
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -186,50 +185,33 @@ const getAvailableCaptains = (req, res) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.getAvailableCaptains = getAvailableCaptains;
-const waitForRideEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const captainId = String((_a = req.captain) === null || _a === void 0 ? void 0 : _a._id);
-    if (!captainId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
+const forwardToWebSocket = (captainId, event, data) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield axios_1.default.post(`${WEBSOCKET_SERVER_URL}/notify`, {
+            userId: captainId,
+            event,
+            data,
+        });
     }
-    const eventType = req.query.event;
-    if (!eventType || !["ride-created", "ride-cancelled"].includes(eventType)) {
-        res.status(400).json({ message: "Invalid or missing event type" });
-        return;
+    catch (err) {
+        console.error("Failed to send WebSocket message:", err.message);
     }
-    let responded = false;
-    const eventKey1 = `${eventType}-${captainId}`; // assigned events
-    const eventKey2 = `${eventType}-unassigned`; // unassigned events
-    const handler = (data) => {
-        if (!responded) {
-            responded = true;
-            clearTimeout(timeout);
-            rideEventEmitter.removeListener(eventKey1, handler);
-            rideEventEmitter.removeListener(eventKey2, handler);
-            res.json({ event: eventType, ride: JSON.parse(data) });
-        }
-    };
-    const timeout = setTimeout(() => {
-        if (!responded) {
-            responded = true;
-            rideEventEmitter.removeListener(eventKey1, handler);
-            rideEventEmitter.removeListener(eventKey2, handler);
-            res.status(204).end();
-        }
-    }, 30000);
-    res.on("close", () => {
-        if (!responded) {
-            responded = true;
-            clearTimeout(timeout);
-            rideEventEmitter.removeListener(eventKey1, handler);
-            rideEventEmitter.removeListener(eventKey2, handler);
-        }
-    });
-    rideEventEmitter.once(eventKey1, handler);
-    rideEventEmitter.once(eventKey2, handler);
 });
-exports.waitForRideEvent = waitForRideEvent;
+// RabbitMQ subscriptions
+subscribeToQueue("ride-created", (msg) => __awaiter(void 0, void 0, void 0, function* () {
+    const data = JSON.parse(msg);
+    const { captainId } = data;
+    if (captainId) {
+        yield forwardToWebSocket(captainId, "ride-created", data);
+    }
+}));
+subscribeToQueue("ride-cancelled", (msg) => __awaiter(void 0, void 0, void 0, function* () {
+    const data = JSON.parse(msg);
+    const { captainId } = data;
+    if (captainId) {
+        yield forwardToWebSocket(captainId, "ride-cancelled", data);
+    }
+}));
 const getCaptainDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const captainId = req.params.id || req.query.id;
@@ -237,7 +219,7 @@ const getCaptainDetails = (req, res) => __awaiter(void 0, void 0, void 0, functi
             res.status(404).send("Captain ID required");
             return;
         }
-        const captain = yield captain_model_1.default.findOne({ captainId });
+        const captain = yield captain_model_1.default.findById(captainId);
         res.send(captain);
     }
     catch (err) {
@@ -291,21 +273,3 @@ const getRideHistory = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.getRideHistory = getRideHistory;
-subscribeToQueue("ride-created", (data) => {
-    const rideData = JSON.parse(data);
-    const captainId = rideData.captainId;
-    if (captainId) {
-        // assigned ride event
-        rideEventEmitter.emit(`ride-created-${captainId}`, data);
-    }
-    else {
-        // unassigned ride event for all available captains
-        rideEventEmitter.emit(`ride-created-unassigned`, data);
-    }
-});
-subscribeToQueue("ride-cancelled", (data) => {
-    const rideData = JSON.parse(data);
-    const captainId = rideData.captainId;
-    const eventKey = `ride-cancelled-${captainId}`;
-    rideEventEmitter.emit(eventKey, data);
-});

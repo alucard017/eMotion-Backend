@@ -44,6 +44,7 @@ router.post("/register", captainController.register);
 router.post("/login", captainController.login);
 router.post("/logout", authMiddleWare_1.captainAuth, captainController.logout);
 router.get("/details/:captainId", captainController.getCaptainDetails);
+router.get("/available", authMiddleWare_1.captainAuth, captainController.isAvailable);
 router.post("/profile", authMiddleWare_1.captainAuth, captainController.updateProfile);
 router.get("/profile", authMiddleWare_1.captainAuth, captainController.profile);
 router.post("/toggle-availability", authMiddleWare_1.captainAuth, captainController.toggleAvailability);

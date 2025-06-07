@@ -23,7 +23,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRideHistory = exports.getAllRideRequests = exports.getCaptainDetails = exports.getAvailableCaptains = exports.toggleAvailability = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
+exports.getRideHistory = exports.getAllRideRequests = exports.getCaptainDetails = exports.getAvailableCaptains = exports.toggleAvailability = exports.isAvailable = exports.updateProfile = exports.profile = exports.logout = exports.login = exports.register = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const captain_model_1 = __importDefault(require("../models/captain.model"));
@@ -183,6 +183,32 @@ const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.updateProfile = updateProfile;
+const isAvailable = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const captainId = (_a = req.captain) === null || _a === void 0 ? void 0 : _a._id;
+        if (!captainId) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const captain = yield captain_model_1.default
+            .findById(captainId)
+            .select("isAvailable");
+        if (!captain) {
+            res.status(404).json({ error: "Captain not found" });
+            return;
+        }
+        console.log(captain.isAvailable);
+        res.json(captain.isAvailable);
+        return;
+    }
+    catch (error) {
+        console.error("Error checking captain availability:", error);
+        res.status(500).json({ error: "Server error" });
+        return;
+    }
+});
+exports.isAvailable = isAvailable;
 const toggleAvailability = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         if (!req.captain) {

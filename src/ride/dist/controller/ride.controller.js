@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRide = exports.getRides = exports.getCaptainById = exports.getUserById = exports.endRide = exports.startRide = exports.cancelRide = exports.acceptRide = exports.createRide = void 0;
+exports.getCurrentRide = exports.getRide = exports.getRides = exports.getCaptainById = exports.getUserById = exports.endRide = exports.startRide = exports.cancelRide = exports.acceptRide = exports.createRide = void 0;
 const ride_model_1 = __importDefault(require("../models/ride.model"));
 const rabbit_1 = __importDefault(require("../service/rabbit"));
 const mongoose_1 = require("mongoose");
@@ -246,7 +246,7 @@ const getRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             }
             query.captain = captainId;
         }
-        const rides = yield ride_model_1.default.find(query);
+        const rides = yield ride_model_1.default.find(query).sort({ createdAt: -1 });
         console.log("Rides are : ", rides);
         const enrichedRides = yield Promise.all(rides.map((ride) => __awaiter(void 0, void 0, void 0, function* () {
             const userInfo = ride.user
@@ -265,3 +265,39 @@ const getRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.getRide = getRide;
+const getCurrentRide = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { Id } = req.query;
+        if (!Id || typeof Id !== "string") {
+            res.status(400).json({ error: "Invalid or missing Id" });
+            return;
+        }
+        let ride = yield ride_model_1.default
+            .findOne({
+            $or: [{ user: Id }, { captain: Id }],
+            status: { $in: ["requested", "accepted", "started", "completed"] },
+        })
+            .sort({ createdAt: -1 });
+        if (!ride) {
+            res.json({ ride: null });
+            return;
+        }
+        console.log("Ride is: ", ride);
+        const userInfo = (ride === null || ride === void 0 ? void 0 : ride.user)
+            ? yield (0, exports.getUserById)(ride.user.toString())
+            : null;
+        const captainInfo = (ride === null || ride === void 0 ? void 0 : ride.captain)
+            ? yield (0, exports.getCaptainById)(ride === null || ride === void 0 ? void 0 : ride.captain.toString())
+            : null;
+        const enrichedRide = Object.assign(Object.assign({}, ride.toObject()), { user: userInfo, captain: captainInfo });
+        console.log("Enriched Ride: ", enrichedRide);
+        res.json({
+            ride: enrichedRide,
+        });
+    }
+    catch (error) {
+        console.error("Error fetching current ride:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+exports.getCurrentRide = getCurrentRide;

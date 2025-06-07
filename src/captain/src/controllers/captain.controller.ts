@@ -201,6 +201,36 @@ export const updateProfile = async (
   }
 };
 
+export const isAvailable = async (
+  req: CaptainRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const captainId = req.captain?._id;
+    if (!captainId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const captain = await captainModel
+      .findById(captainId)
+      .select("isAvailable");
+
+    if (!captain) {
+      res.status(404).json({ error: "Captain not found" });
+      return;
+    }
+
+    console.log(captain.isAvailable);
+    res.json(captain.isAvailable);
+    return;
+  } catch (error) {
+    console.error("Error checking captain availability:", error);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+};
+
 export const toggleAvailability = async (
   req: CaptainRequest,
   res: Response

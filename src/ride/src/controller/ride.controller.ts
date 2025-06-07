@@ -376,7 +376,7 @@ export const getRide = async (
       query.captain = captainId;
     }
 
-    const rides = await rideModel.find(query);
+    const rides = await rideModel.find(query).sort({ createdAt: -1 });
 
     console.log("Rides are : ", rides);
     const enrichedRides = await Promise.all(
@@ -400,5 +400,49 @@ export const getRide = async (
     res.json({ rides: enrichedRides });
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Failed to fetch rides" });
+  }
+};
+
+export const getCurrentRide = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { Id } = req.query;
+
+    if (!Id || typeof Id !== "string") {
+      res.status(400).json({ error: "Invalid or missing Id" });
+      return;
+    }
+    let ride = await rideModel
+      .findOne({
+        $or: [{ user: Id }, { captain: Id }],
+        status: { $in: ["requested", "accepted", "started", "completed"] },
+      })
+      .sort({ createdAt: -1 });
+    if (!ride) {
+      res.json({ ride: null });
+      return;
+    }
+    console.log("Ride is: ", ride);
+    const userInfo = ride?.user
+      ? await getUserById(ride.user.toString())
+      : null;
+    const captainInfo = ride?.captain
+      ? await getCaptainById(ride?.captain.toString())
+      : null;
+
+    const enrichedRide = {
+      ...ride.toObject(),
+      user: userInfo,
+      captain: captainInfo,
+    };
+    console.log("Enriched Ride: ", enrichedRide);
+    res.json({
+      ride: enrichedRide,
+    });
+  } catch (error) {
+    console.error("Error fetching current ride:", error);
+    res.status(500).json({ error: "Server error" });
   }
 };

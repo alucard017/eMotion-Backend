@@ -10,6 +10,7 @@ router.post("/cancel-ride", userAuth, rideController.cancelRide);
 router.post("/accept-ride", captainAuth, rideController.acceptRide);
 router.post("/start-ride", captainAuth, rideController.startRide);
 router.post("/end-ride", captainAuth, rideController.endRide);
+router.get("/current-ride", rideController.getCurrentRide);
 router.get("/rides", rideController.getRides);
 router.post("/ride-history", rideController.getRide);
 

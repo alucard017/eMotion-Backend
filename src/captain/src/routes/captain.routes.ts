@@ -8,6 +8,7 @@ router.post("/register", captainController.register);
 router.post("/login", captainController.login);
 router.post("/logout", captainAuth, captainController.logout);
 router.get("/details/:captainId", captainController.getCaptainDetails);
+router.get("/available", captainAuth, captainController.isAvailable);
 router.post("/profile", captainAuth, captainController.updateProfile);
 router.get("/profile", captainAuth, captainController.profile);
 router.post(

@@ -43,6 +43,7 @@ router.post("/cancel-ride", auth_middleware_1.userAuth, rideController.cancelRid
 router.post("/accept-ride", auth_middleware_2.captainAuth, rideController.acceptRide);
 router.post("/start-ride", auth_middleware_2.captainAuth, rideController.startRide);
 router.post("/end-ride", auth_middleware_2.captainAuth, rideController.endRide);
+router.get("/current-ride", rideController.getCurrentRide);
 router.get("/rides", rideController.getRides);
 router.post("/ride-history", rideController.getRide);
 exports.default = router;

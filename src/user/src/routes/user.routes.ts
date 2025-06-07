@@ -10,7 +10,7 @@ router.post("/logout", userAuth, userController.logout);
 router.get("/details/:userId", userController.getUserDetails);
 router.get("/profile", userAuth, userController.profile);
 router.post("/profile", userAuth, userController.updateProfile);
-router.get("/get-captains", userAuth, userController.availableCaptains);
+router.get("/get-captains", userAuth, userController.getAvailableCaptains);
 router.get("/ride-history", userAuth, userController.getRideHistory);
 
 export default router;

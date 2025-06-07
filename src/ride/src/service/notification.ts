@@ -2,12 +2,18 @@ import axios from "axios";
 
 const WS_SERVER_URL = process.env.WS_SERVER_URL || "http://localhost:8080";
 
-export const notifyUser = async (userId: string, event: string, data: any) => {
+export const notifyUser = async (
+  userId: string,
+  event: string,
+  data: any,
+  role?: "user" | "captain"
+) => {
   try {
     await axios.post(`${WS_SERVER_URL}/notify`, {
       userId,
       event,
       data,
+      ...(role ? { role } : {}),
     });
   } catch (error: any) {
     console.error(

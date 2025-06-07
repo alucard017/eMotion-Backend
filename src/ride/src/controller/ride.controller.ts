@@ -13,13 +13,20 @@ interface AuthenticatedRequest extends Request {
   captain?: { _id: string };
 }
 
+const EVENT_TYPES = {
+  RIDE_CREATED: "ride-created",
+  RIDE_CANCELLED: "ride-cancelled",
+  RIDE_ACCEPTED: "ride-accepted",
+  RIDE_STARTED: "ride-started",
+  RIDE_COMPLETED: "ride-completed",
+};
+
 export const createRide = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    console.log(`createRide invoked`);
     const { pickup, destination, fare } = req.body;
 
     if (!req.user?._id) {
@@ -36,8 +43,8 @@ export const createRide = async (
     });
 
     await newRide.save();
-    await publishToQueue("ride-created", JSON.stringify(newRide));
-    await notifyUser(req.user._id, "ride-created", newRide);
+    await publishToQueue(EVENT_TYPES.RIDE_CREATED, JSON.stringify(newRide));
+    await notifyUser(req.user._id, EVENT_TYPES.RIDE_CREATED, newRide, "user");
 
     res.status(201).send(newRide);
   } catch (error) {
@@ -77,9 +84,14 @@ export const acceptRide = async (
       return;
     }
 
-    publishToQueue("ride-accepted", JSON.stringify(ride));
-    notifyUser(ride.user.toString(), "ride-accepted", ride);
-    notifyUser(req.captain._id, "ride-accepted", ride);
+    publishToQueue(EVENT_TYPES.RIDE_ACCEPTED, JSON.stringify(ride));
+    await notifyUser(
+      ride.user.toString(),
+      EVENT_TYPES.RIDE_ACCEPTED,
+      ride,
+      "user"
+    );
+    // await notifyUser(req.captain._id, "ride-accepted", ride);
 
     res.send(ride);
   } catch (error) {
@@ -120,8 +132,18 @@ export const cancelRide = async (
       return;
     }
 
-    publishToQueue("ride-cancelled", JSON.stringify(ride));
-    notifyUser(req.user._id, "ride-cancelled", ride);
+    await publishToQueue(EVENT_TYPES.RIDE_CANCELLED, JSON.stringify(ride));
+    await notifyUser(req.user._id, EVENT_TYPES.RIDE_CANCELLED, ride, "user");
+
+    // Notify captain if assigned
+    if (ride.captain) {
+      await notifyUser(
+        ride.captain.toString(),
+        EVENT_TYPES.RIDE_CANCELLED,
+        ride,
+        "captain"
+      );
+    }
 
     res.send({ message: "Ride cancelled successfully", ride });
   } catch (error) {
@@ -163,9 +185,14 @@ export const startRide = async (
       return;
     }
 
-    publishToQueue("ride-started", JSON.stringify(ride));
-    notifyUser(ride.user.toString(), "ride-started", ride);
-    notifyUser(req.captain._id, "ride-started", ride);
+    publishToQueue(EVENT_TYPES.RIDE_STARTED, JSON.stringify(ride));
+    await notifyUser(
+      ride.user.toString(),
+      EVENT_TYPES.RIDE_STARTED,
+      ride,
+      "user"
+    );
+    // await notifyUser(req.captain._id, "ride-started", ride);
 
     res.send(ride);
   } catch (error) {
@@ -206,9 +233,14 @@ export const endRide = async (
       return;
     }
 
-    publishToQueue("ride-completed", JSON.stringify(ride));
-    notifyUser(ride.user.toString(), "ride-completed", ride);
-    notifyUser(req.captain._id, "ride-completed", ride);
+    publishToQueue(EVENT_TYPES.RIDE_COMPLETED, JSON.stringify(ride));
+    await notifyUser(
+      ride.user.toString(),
+      EVENT_TYPES.RIDE_COMPLETED,
+      ride,
+      "user"
+    );
+    // await notifyUser(req.captain._id, "ride-completed", ride);
 
     res.send(ride);
   } catch (error) {

@@ -13,11 +13,4 @@ router.post("/end-ride", captainAuth, rideController.endRide);
 router.get("/rides", rideController.getRides);
 router.post("/ride-history", rideController.getRide);
 
-// router.post("/create-ride", rideController.createRide);
-// router.post("/cancel-ride", rideController.cancelRide);
-// router.post("/accept-ride", rideController.acceptRide);
-// router.post("/start-ride", rideController.startRide);
-// router.post("/end-ride", rideController.endRide);
-// router.get("/rides", rideController.getRides);
-// router.post("/ride-history", rideController.getRide);
 export default router;

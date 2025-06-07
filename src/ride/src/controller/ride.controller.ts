@@ -36,8 +36,8 @@ export const createRide = async (
     });
 
     await newRide.save();
-    publishToQueue("ride-created", JSON.stringify(newRide));
-    notifyUser(req.user._id, "ride-created", newRide);
+    await publishToQueue("ride-created", JSON.stringify(newRide));
+    await notifyUser(req.user._id, "ride-created", newRide);
 
     res.status(201).send(newRide);
   } catch (error) {

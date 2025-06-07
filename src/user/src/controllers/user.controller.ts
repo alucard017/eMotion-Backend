@@ -5,11 +5,10 @@ import userModel from "../models/user.model";
 import blacklisttokenModel from "../models/blacklisttoken.model";
 import rabbitMq from "../service/rabbit";
 import axios from "axios";
+import { notifyUser } from "../service/notification";
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
 const { subscribeToQueue } = rabbitMq;
-
-const WEBSOCKET_SERVER_URL = "http://localhost:8080"; // Update if hosted elsewhere
 
 interface UserRequest extends Request {
   user?: any;
@@ -222,32 +221,26 @@ export const getRideHistory = async (
   }
 };
 
-const forwardToWebSocket = async (userId: string, event: string, data: any) => {
-  try {
-    await axios.post(`${WEBSOCKET_SERVER_URL}/notify`, {
-      userId,
-      event,
-      data,
-    });
-  } catch (err: any) {
-    console.error("Failed to send WebSocket message:", err.message);
-  }
-};
-
 subscribeToQueue("ride-accepted", async (msg: string) => {
   const data = JSON.parse(msg);
   const { userId } = data;
-  await forwardToWebSocket(userId, "ride-accepted", data);
+  if (userId) {
+    await notifyUser(userId, "ride-accepted", data);
+  }
 });
 
 subscribeToQueue("ride-started", async (msg: string) => {
   const data = JSON.parse(msg);
   const { userId } = data;
-  await forwardToWebSocket(userId, "ride-started", data);
+  if (userId) {
+    await notifyUser(userId, "ride-started", data);
+  }
 });
 
 subscribeToQueue("ride-completed", async (msg: string) => {
   const data = JSON.parse(msg);
   const { userId } = data;
-  await forwardToWebSocket(userId, "ride-completed", data);
+  if (userId) {
+    await notifyUser(userId, "ride-completed", data);
+  }
 });

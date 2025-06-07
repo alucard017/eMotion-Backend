@@ -6,6 +6,7 @@ import blacklisttokenModel from "../models/blacklisttoken.model";
 import rabbitMq from "../service/rabbit";
 import axios from "axios";
 import { EventEmitter } from "events";
+import { notifyUser } from "../service/notification";
 const { subscribeToQueue } = rabbitMq;
 const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
 const WEBSOCKET_SERVER_URL = "http://localhost:8080";
@@ -206,28 +207,12 @@ export const getAvailableCaptains = async (
   }
 };
 
-const forwardToWebSocket = async (
-  captainId: string,
-  event: string,
-  data: any
-) => {
-  try {
-    await axios.post(`${WEBSOCKET_SERVER_URL}/notify`, {
-      userId: captainId,
-      event,
-      data,
-    });
-  } catch (err: any) {
-    console.error("Failed to send WebSocket message:", err.message);
-  }
-};
-
 // RabbitMQ subscriptions
 subscribeToQueue("ride-created", async (msg: string) => {
   const data = JSON.parse(msg);
   const { captainId } = data;
   if (captainId) {
-    await forwardToWebSocket(captainId, "ride-created", data);
+    await notifyUser(captainId, "ride-created", data);
   }
 });
 
@@ -235,18 +220,25 @@ subscribeToQueue("ride-cancelled", async (msg: string) => {
   const data = JSON.parse(msg);
   const { captainId } = data;
   if (captainId) {
-    await forwardToWebSocket(captainId, "ride-cancelled", data);
+    await notifyUser(captainId, "ride-cancelled", data);
   }
 });
 
 export const getCaptainDetails = async (req: CaptainRequest, res: Response) => {
   try {
-    const captainId = req.params.id || req.query.id;
+    const captainId = req.params?.captainId || req.query.captainId;
     if (!captainId) {
       res.status(404).send("Captain ID required");
       return;
     }
-    const captain = await captainModel.findById(captainId);
+    const captain = await captainModel
+      .findById(captainId)
+      .select("name phone vehicle");
+    if (!captain) {
+      res.status(404).send("Captain not found");
+      return;
+    }
+    console.log(`Captain details:`, captain);
     res.send(captain);
   } catch (err: any) {
     res

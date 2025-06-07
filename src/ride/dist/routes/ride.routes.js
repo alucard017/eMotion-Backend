@@ -45,11 +45,4 @@ router.post("/start-ride", auth_middleware_2.captainAuth, rideController.startRi
 router.post("/end-ride", auth_middleware_2.captainAuth, rideController.endRide);
 router.get("/rides", rideController.getRides);
 router.post("/ride-history", rideController.getRide);
-// router.post("/create-ride", rideController.createRide);
-// router.post("/cancel-ride", rideController.cancelRide);
-// router.post("/accept-ride", rideController.acceptRide);
-// router.post("/start-ride", rideController.startRide);
-// router.post("/end-ride", rideController.endRide);
-// router.get("/rides", rideController.getRides);
-// router.post("/ride-history", rideController.getRide);
 exports.default = router;

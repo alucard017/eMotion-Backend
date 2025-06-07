@@ -30,19 +30,44 @@ const user_model_1 = __importDefault(require("../models/user.model"));
 const blacklisttoken_model_1 = __importDefault(require("../models/blacklisttoken.model"));
 const rabbit_1 = __importDefault(require("../service/rabbit"));
 const axios_1 = __importDefault(require("axios"));
-const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
+const notification_1 = require("../service/notification");
 const { subscribeToQueue } = rabbit_1.default;
-const WEBSOCKET_SERVER_URL = "http://localhost:8080"; // Update if hosted elsewhere
+const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
+const EVENT_TYPES = {
+    RIDE_ACCEPTED: "ride-accepted",
+    RIDE_STARTED: "ride-started",
+    RIDE_COMPLETED: "ride-completed",
+};
+function extractToken(req) {
+    var _a, _b;
+    return ((_a = req.cookies) === null || _a === void 0 ? void 0 : _a.token) || ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1]);
+}
+function validateRegisterInput(body) {
+    const { name, email, phone, password } = body;
+    if (!name || !email || !phone || !password)
+        return false;
+    // TODO: Add regex/email/phone/password strength validation
+    return true;
+}
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        if (!validateRegisterInput(req.body)) {
+            res.status(400).json({ message: "Missing or invalid fields" });
+            return;
+        }
         const { name, email, phone, password } = req.body;
-        const user = yield user_model_1.default.findOne({ email });
-        if (user) {
+        const existingUser = yield user_model_1.default.findOne({ email });
+        if (existingUser) {
             res.status(400).json({ message: "User already exists" });
             return;
         }
-        const hash = yield bcrypt_1.default.hash(password, 10);
-        const newUser = new user_model_1.default({ name, email, phone, password: hash });
+        const hashedPassword = yield bcrypt_1.default.hash(password, 10);
+        const newUser = new user_model_1.default({
+            name,
+            email,
+            phone,
+            password: hashedPassword,
+        });
         yield newUser.save();
         const token = jsonwebtoken_1.default.sign({ id: newUser._id }, process.env.JWT_SECRET, {
             expiresIn: "1h",
@@ -52,21 +77,24 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
         });
-        const cleanUser = newUser.toObject();
-        const { password: _ } = cleanUser, userWithoutPassword = __rest(cleanUser, ["password"]);
-        res.send({ token, userWithoutPassword });
+        const _a = newUser.toObject(), { password: _ } = _a, userWithoutPassword = __rest(_a, ["password"]);
+        res.status(201).json({ token, user: userWithoutPassword });
     }
     catch (error) {
-        res.status(500).json({ message: "Unable to register User" });
+        res.status(500).json({ message: error.message || "Registration failed" });
     }
 });
 exports.register = register;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
+        if (!email || !password) {
+            res.status(400).json({ message: "Email and password required" });
+            return;
+        }
         const user = yield user_model_1.default.findOne({ email }).select("+password");
         if (!user || !(yield bcrypt_1.default.compare(password, user.password))) {
-            res.status(400).json({ message: "Invalid email or password" });
+            res.status(401).json({ message: "Invalid email or password" });
             return;
         }
         const token = jsonwebtoken_1.default.sign({ id: user._id }, process.env.JWT_SECRET, {
@@ -77,43 +105,55 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
         });
-        const cleanUser = user.toObject();
-        const { password: _ } = cleanUser, userWithoutPassword = __rest(cleanUser, ["password"]);
-        res.send({ token, userWithoutPassword });
+        const _a = user.toObject(), { password: _ } = _a, userWithoutPassword = __rest(_a, ["password"]);
+        res.json({ token, user: userWithoutPassword });
     }
     catch (error) {
-        res.status(500).json({ message: "Unable to Signin" });
+        res.status(500).json({ message: error.message || "Login failed" });
     }
 });
 exports.login = login;
 const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const token = req.cookies.token || ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1]);
-        yield blacklisttoken_model_1.default.create({ token });
-        res.clearCookie("token");
-        res.send({ message: "User logged out successfully" });
+        const token = extractToken(req);
+        if (!token) {
+            res.status(400).json({ message: "No token found" });
+            return;
+        }
+        yield Promise.all([
+            blacklisttoken_model_1.default.create({ token }),
+            res.clearCookie("token"),
+        ]);
+        res.json({ message: "User logged out successfully" });
     }
     catch (error) {
-        res.status(500).json({ message: "Error while Logging out" });
+        res.status(500).json({ message: error.message || "Logout failed" });
     }
 });
 exports.logout = logout;
 const profile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        res.send(req.user);
+        if (!req.user) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+        res.json(req.user);
     }
-    catch (error) {
-        res.status(500).json({ message: "Error while fetching profile" });
+    catch (_a) {
+        res.status(500).json({ message: "Error fetching profile" });
     }
 });
 exports.profile = profile;
 const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        if (!req.user) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
         const { name, email, phone } = req.body;
         const user = yield user_model_1.default.findById(req.user._id);
         if (!user) {
-            res.status(404).json({ message: "Captain not found" });
+            res.status(404).json({ message: "User not found" });
             return;
         }
         if (name)
@@ -123,74 +163,60 @@ const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         if (phone)
             user.phone = phone;
         yield user.save();
-        const cleanUser = user.toObject();
-        const { password: _ } = cleanUser, userWithoutPassword = __rest(cleanUser, ["password"]);
+        const _a = user.toObject(), { password: _ } = _a, userWithoutPassword = __rest(_a, ["password"]);
         res.json({
             message: "Profile updated successfully",
-            captain: userWithoutPassword,
+            user: userWithoutPassword,
         });
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error.message || "Profile update failed" });
     }
 });
 exports.updateProfile = updateProfile;
 const availableCaptains = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-    if (!userId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-    }
     try {
-        const response = yield fetch(`${BASE_URL}/api/captain/get-captains`);
-        if (!response.ok) {
-            throw new Error("Captain service unavailable");
-        }
-        const data = yield response.json();
-        res.status(200).json({ captains: data });
+        const { data } = yield axios_1.default.get(`${BASE_URL}/api/captain/get-captains`);
+        res.json({ captains: data });
     }
     catch (error) {
-        console.error("Error fetching captains:", error);
-        res.status(503).json({ message: "Unable to fetch captains" });
+        res
+            .status(503)
+            .json({ message: error.message || "Failed to fetch captains" });
     }
 });
 exports.availableCaptains = availableCaptains;
 const getUserDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const id = ((_a = req.params) === null || _a === void 0 ? void 0 : _a.userId) || req.query.userId;
-        if (!id) {
-            res.status(400).send("User ID (_id) required");
+        const userId = req.params.userId || req.query.userId;
+        if (!userId) {
+            res.status(400).json({ message: "User ID required" });
             return;
         }
-        console.log(`User id for user details is: `, id);
-        const user = yield user_model_1.default.findById(id).select("name phone");
+        const user = yield user_model_1.default.findById(userId).select("name phone");
         if (!user) {
-            res.status(404).send("User not found");
+            res.status(404).json({ message: "User not found" });
             return;
         }
-        console.log(`User details:`, user);
-        res.send(user);
+        res.json(user);
     }
-    catch (err) {
+    catch (error) {
         res
             .status(500)
-            .json({ message: err.message || "Failed to fetch user details" });
+            .json({ message: error.message || "Failed to fetch user details" });
     }
 });
 exports.getUserDetails = getUserDetails;
 const getRideHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
-        if (!userId) {
+        if (!((_a = req.user) === null || _a === void 0 ? void 0 : _a._id)) {
             res.status(401).json({ message: "Unauthorized: User not found" });
             return;
         }
         const response = yield axios_1.default.post(`${BASE_URL}/api/ride/ride-history`, {
+            userId: req.user._id,
             status: "all",
-            userId,
         }, {
             withCredentials: true,
             headers: {
@@ -201,37 +227,27 @@ const getRideHistory = (req, res) => __awaiter(void 0, void 0, void 0, function*
         res.json(response.data);
     }
     catch (error) {
-        console.error("Error fetching user ride history:", error);
         res
             .status(500)
             .json({ message: error.message || "Failed to fetch ride history" });
     }
 });
 exports.getRideHistory = getRideHistory;
-const forwardToWebSocket = (userId, event, data) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        yield axios_1.default.post(`${WEBSOCKET_SERVER_URL}/notify`, {
-            userId,
-            event,
-            data,
-        });
-    }
-    catch (err) {
-        console.error("Failed to send WebSocket message:", err.message);
-    }
+[
+    EVENT_TYPES.RIDE_ACCEPTED,
+    EVENT_TYPES.RIDE_STARTED,
+    EVENT_TYPES.RIDE_COMPLETED,
+].forEach((event) => {
+    subscribeToQueue(event, (msg) => __awaiter(void 0, void 0, void 0, function* () {
+        try {
+            const data = JSON.parse(msg);
+            const userId = data.userId;
+            if (userId) {
+                yield (0, notification_1.notifyUser)(userId, event, data, "user");
+            }
+        }
+        catch (err) {
+            console.log(`Something wrong happened on server: ${err.message}`);
+        }
+    }));
 });
-subscribeToQueue("ride-accepted", (msg) => __awaiter(void 0, void 0, void 0, function* () {
-    const data = JSON.parse(msg);
-    const { userId } = data;
-    yield forwardToWebSocket(userId, "ride-accepted", data);
-}));
-subscribeToQueue("ride-started", (msg) => __awaiter(void 0, void 0, void 0, function* () {
-    const data = JSON.parse(msg);
-    const { userId } = data;
-    yield forwardToWebSocket(userId, "ride-started", data);
-}));
-subscribeToQueue("ride-completed", (msg) => __awaiter(void 0, void 0, void 0, function* () {
-    const data = JSON.parse(msg);
-    const { userId } = data;
-    yield forwardToWebSocket(userId, "ride-completed", data);
-}));

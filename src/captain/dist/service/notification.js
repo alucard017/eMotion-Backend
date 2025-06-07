@@ -15,14 +15,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.notifyUser = void 0;
 const axios_1 = __importDefault(require("axios"));
 const WS_SERVER_URL = process.env.WS_SERVER_URL || "http://localhost:8080";
-const notifyUser = (userId, event, data, role) => __awaiter(void 0, void 0, void 0, function* () {
+const notifyUser = (captainId, event, data, role) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield axios_1.default.post(`${WS_SERVER_URL}/notify`, Object.assign({ userId,
-            event,
+        yield axios_1.default.post(`${WS_SERVER_URL}/notify`, Object.assign({ userId: captainId, event,
             data }, (role ? { role } : {})));
     }
     catch (error) {
-        console.error(`Failed to notify user ${userId} via WebSocket:`, error.message);
+        console.error(`Failed to notify user ${captainId} via WebSocket:`, error.message);
     }
 });
 exports.notifyUser = notifyUser;

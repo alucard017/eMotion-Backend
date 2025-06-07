@@ -1,1 +1,1 @@
-{"root":["./src/server.ts","./src/controllers/captain.controller.ts","./src/db/db.ts","./src/middleware/authmiddleware.ts","./src/models/blacklisttoken.model.ts","./src/models/captain.model.ts","./src/routes/captain.routes.ts","./src/service/rabbit.ts"],"version":"5.8.3"}
+{"root":["./src/server.ts","./src/controllers/captain.controller.ts","./src/db/db.ts","./src/middleware/authmiddleware.ts","./src/models/blacklisttoken.model.ts","./src/models/captain.model.ts","./src/routes/captain.routes.ts","./src/service/notification.ts","./src/service/rabbit.ts"],"version":"5.8.3"}

@@ -140,7 +140,7 @@ export const profile = async (
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    res.json({ user: req.user });
+    res.json(req.user);
   } catch {
     res.status(500).json({ message: "Error fetching profile" });
   }
@@ -179,7 +179,7 @@ export const updateProfile = async (
   }
 };
 
-export const getAvailableCaptains = async (
+export const availableCaptains = async (
   req: UserRequest,
   res: Response
 ): Promise<void> => {

@@ -20,10 +20,16 @@ const axios_1 = __importDefault(require("axios"));
 const notification_1 = require("../service/notification");
 const { publishToQueue } = rabbit_1.default;
 const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
+const EVENT_TYPES = {
+    RIDE_CREATED: "ride-created",
+    RIDE_CANCELLED: "ride-cancelled",
+    RIDE_ACCEPTED: "ride-accepted",
+    RIDE_STARTED: "ride-started",
+    RIDE_COMPLETED: "ride-completed",
+};
 const createRide = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log(`createRide invoked`);
         const { pickup, destination, fare } = req.body;
         if (!((_a = req.user) === null || _a === void 0 ? void 0 : _a._id)) {
             res.status(401).json({ message: "Unauthorized: User not found" });
@@ -37,9 +43,11 @@ const createRide = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             status: "requested",
         });
         yield newRide.save();
-        publishToQueue("ride-created", JSON.stringify(newRide));
-        (0, notification_1.notifyUser)(req.user._id, "ride-created", newRide);
-        res.status(201).send(newRide);
+        const userInfo = yield (0, exports.getUserById)(req.user._id);
+        const enrichedRide = Object.assign(Object.assign({}, newRide.toObject()), { user: userInfo, captain: null });
+        yield publishToQueue(EVENT_TYPES.RIDE_CREATED, JSON.stringify(enrichedRide));
+        yield (0, notification_1.notifyUser)(req.user._id, EVENT_TYPES.RIDE_CREATED, { ride: enrichedRide }, "user");
+        res.status(201).send(enrichedRide);
     }
     catch (error) {
         next(error);
@@ -49,28 +57,30 @@ exports.createRide = createRide;
 const acceptRide = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log("Captain info from request:", req.captain);
-        console.log("Request body: ", req.body);
         const rideId = req.body.rideId;
-        console.log(`AcceptRide invoked and ride id is: ${rideId}`);
+        const captainId = (_a = req.captain) === null || _a === void 0 ? void 0 : _a._id;
         if (!rideId) {
             res.status(400).json({ message: "Ride ID is required" });
             return;
         }
-        if (!((_a = req.captain) === null || _a === void 0 ? void 0 : _a._id)) {
+        if (!captainId) {
             res.status(401).json({ message: "Unauthorized: Captain not found" });
             return;
         }
-        const ride = yield ride_model_1.default.findOneAndUpdate({ _id: rideId, status: "requested" }, { status: "accepted", captain: new mongoose_1.Types.ObjectId(req.captain._id) }, { new: true });
-        console.log(`Ride is ${ride}`);
+        const ride = yield ride_model_1.default.findOneAndUpdate({ _id: rideId, status: "requested" }, { status: "accepted", captain: new mongoose_1.Types.ObjectId(captainId) }, { new: true });
         if (!ride) {
             res.status(409).json({ message: "Ride already accepted or unavailable" });
             return;
         }
-        publishToQueue("ride-accepted", JSON.stringify(ride));
-        (0, notification_1.notifyUser)(ride.user.toString(), "ride-accepted", ride);
-        (0, notification_1.notifyUser)(req.captain._id, "ride-accepted", ride);
-        res.send(ride);
+        const captainDetails = yield (0, exports.getCaptainById)(captainId);
+        const enrichedRide = Object.assign(Object.assign({}, ride.toObject()), { captain: {
+                name: captainDetails.name,
+                phone: captainDetails.phone,
+                vehicle: captainDetails.vehicle,
+            } });
+        publishToQueue(EVENT_TYPES.RIDE_ACCEPTED, JSON.stringify(enrichedRide));
+        yield (0, notification_1.notifyUser)(ride.user.toString(), EVENT_TYPES.RIDE_ACCEPTED, { ride: enrichedRide }, "user");
+        res.send(enrichedRide);
     }
     catch (error) {
         next(error);
@@ -98,9 +108,17 @@ const cancelRide = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             res.status(409).json({ message: "Ride cannot be cancelled" });
             return;
         }
-        publishToQueue("ride-cancelled", JSON.stringify(ride));
-        (0, notification_1.notifyUser)(req.user._id, "ride-cancelled", ride);
-        res.send({ message: "Ride cancelled successfully", ride });
+        const userInfo = yield (0, exports.getUserById)(ride.user.toString());
+        const captainInfo = ride.captain
+            ? yield (0, exports.getCaptainById)(ride.captain.toString())
+            : null;
+        const enrichedRide = Object.assign(Object.assign({}, ride.toObject()), { user: userInfo, captain: captainInfo });
+        yield publishToQueue(EVENT_TYPES.RIDE_CANCELLED, JSON.stringify(enrichedRide));
+        yield (0, notification_1.notifyUser)(req.user._id, EVENT_TYPES.RIDE_CANCELLED, { ride: enrichedRide }, "user");
+        if (ride.captain) {
+            yield (0, notification_1.notifyUser)(ride.captain.toString(), EVENT_TYPES.RIDE_CANCELLED, { ride: enrichedRide }, "captain");
+        }
+        res.send({ message: "Ride cancelled successfully", ride: enrichedRide });
     }
     catch (error) {
         next(error);
@@ -110,9 +128,7 @@ exports.cancelRide = cancelRide;
 const startRide = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log("Start ride invoked");
         const rideId = req.body.rideId;
-        console.log("Ride id from start ride:", rideId);
         if (!rideId) {
             res.status(400).json({ message: "Ride ID is required" });
             return;
@@ -130,10 +146,11 @@ const startRide = (req, res, next) => __awaiter(void 0, void 0, void 0, function
             res.status(409).json({ message: "Ride cannot be started" });
             return;
         }
-        publishToQueue("ride-started", JSON.stringify(ride));
-        (0, notification_1.notifyUser)(ride.user.toString(), "ride-started", ride);
-        (0, notification_1.notifyUser)(req.captain._id, "ride-started", ride);
-        res.send(ride);
+        const captainDetails = yield (0, exports.getCaptainById)(req.captain._id);
+        const enrichedRide = Object.assign(Object.assign({}, ride.toObject()), { captain: captainDetails });
+        publishToQueue(EVENT_TYPES.RIDE_STARTED, JSON.stringify(enrichedRide));
+        yield (0, notification_1.notifyUser)(ride.user.toString(), EVENT_TYPES.RIDE_STARTED, { ride: enrichedRide }, "user");
+        res.send(enrichedRide);
     }
     catch (error) {
         next(error);
@@ -161,10 +178,11 @@ const endRide = (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
             res.status(409).json({ message: "Ride cannot be ended" });
             return;
         }
-        publishToQueue("ride-completed", JSON.stringify(ride));
-        (0, notification_1.notifyUser)(ride.user.toString(), "ride-completed", ride);
-        (0, notification_1.notifyUser)(req.captain._id, "ride-completed", ride);
-        res.send(ride);
+        const captainDetails = yield (0, exports.getCaptainById)(req.captain._id);
+        const enrichedRide = Object.assign(Object.assign({}, ride.toObject()), { captain: captainDetails });
+        publishToQueue(EVENT_TYPES.RIDE_COMPLETED, JSON.stringify(enrichedRide));
+        yield (0, notification_1.notifyUser)(ride.user.toString(), EVENT_TYPES.RIDE_COMPLETED, { ride: enrichedRide }, "user");
+        res.send(enrichedRide);
     }
     catch (error) {
         next(error);
@@ -177,7 +195,7 @@ const getUserById = (userId) => __awaiter(void 0, void 0, void 0, function* () {
 });
 exports.getUserById = getUserById;
 const getCaptainById = (captainId) => __awaiter(void 0, void 0, void 0, function* () {
-    const { data } = yield axios_1.default.get(`${BASE_URL}/api/captain/${captainId}`);
+    const { data } = yield axios_1.default.get(`${BASE_URL}/api/captain/details/${captainId}`);
     return { name: data.name, phone: data.phone, vehicle: data.vehicle };
 });
 exports.getCaptainById = getCaptainById;

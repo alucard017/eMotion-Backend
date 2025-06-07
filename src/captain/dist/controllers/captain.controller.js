@@ -30,13 +30,35 @@ const captain_model_1 = __importDefault(require("../models/captain.model"));
 const blacklisttoken_model_1 = __importDefault(require("../models/blacklisttoken.model"));
 const rabbit_1 = __importDefault(require("../service/rabbit"));
 const axios_1 = __importDefault(require("axios"));
+const notification_1 = require("../service/notification");
 const { subscribeToQueue } = rabbit_1.default;
 const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
-const WEBSOCKET_SERVER_URL = "http://localhost:8080";
-const pendingRequests = new Map();
+const EVENT_TYPES = {
+    RIDE_CREATED: "ride-created",
+    RIDE_CANCELLED: "ride-cancelled",
+};
+const RIDE_STATUS = {
+    ALL: "all",
+};
+function extractToken(req) {
+    var _a, _b;
+    return ((_a = req.cookies) === null || _a === void 0 ? void 0 : _a.token) || ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1]);
+}
+// Basic input validation placeholder (extend as needed)
+function validateRegisterInput(body) {
+    const { name, email, phone, vehicle, password } = body;
+    if (!name || !email || !phone || !vehicle || !password) {
+        return false;
+    }
+    // TODO: Add regex/email/phone/password strength validation
+    return true;
+}
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log(`Captain Register Invoked`);
+        if (!validateRegisterInput(req.body)) {
+            res.status(400).json({ message: "Missing or invalid fields" });
+            return;
+        }
         const { name, email, phone, vehicle, password } = req.body;
         const existingCaptain = yield captain_model_1.default.findOne({ email });
         if (existingCaptain) {
@@ -58,26 +80,24 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
         });
-        const cleanCaptain = newCaptain.toObject();
-        const { password: _ } = cleanCaptain, captainWithoutPassword = __rest(cleanCaptain, ["password"]);
-        res.send({ token, captain: captainWithoutPassword });
+        const _a = newCaptain.toObject(), { password: _ } = _a, captainWithoutPassword = __rest(_a, ["password"]);
+        res.status(201).json({ token, captain: captainWithoutPassword });
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error.message || "Registration failed" });
     }
 });
 exports.register = register;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log(`Captain Login Invoked`);
         const { email, password } = req.body;
         if (!email || !password) {
-            res.status(404).json({ message: "Both fields are required" });
+            res.status(400).json({ message: "Email and password required" });
             return;
         }
         const captain = yield captain_model_1.default.findOne({ email }).select("+password");
         if (!captain || !(yield bcrypt_1.default.compare(password, captain.password))) {
-            res.status(400).json({ message: "Invalid email or password" });
+            res.status(401).json({ message: "Invalid email or password" });
             return;
         }
         const token = jsonwebtoken_1.default.sign({ id: captain._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
@@ -86,39 +106,45 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
         });
-        const cleanCaptain = captain.toObject();
-        const { password: _ } = cleanCaptain, captainWithoutPassword = __rest(cleanCaptain, ["password"]);
-        res.send({ token, captain: captainWithoutPassword });
+        const _a = captain.toObject(), { password: _ } = _a, captainWithoutPassword = __rest(_a, ["password"]);
+        res.json({ token, captain: captainWithoutPassword });
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error.message || "Login failed" });
     }
 });
 exports.login = login;
 const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a;
     try {
-        console.log(`Captain Logout Invoked`);
-        const token = req.cookies.token || ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1]);
-        // console.log(req.captain);
-        const captainId = (_b = req.captain) === null || _b === void 0 ? void 0 : _b._id;
-        if (captainId) {
-            yield captain_model_1.default.findByIdAndUpdate(captainId, { isAvailable: false });
-            // console.log(`LOGOUT isavailable set false`);
+        const token = extractToken(req);
+        if (!token) {
+            res.status(400).json({ message: "No token found" });
+            return;
         }
-        yield blacklisttoken_model_1.default.create({ token });
-        res.clearCookie("token");
-        res.send({ message: "Captain logged out successfully and set offline" });
+        if ((_a = req.captain) === null || _a === void 0 ? void 0 : _a._id) {
+            yield captain_model_1.default.findByIdAndUpdate(req.captain._id, {
+                isAvailable: false,
+            });
+        }
+        yield Promise.all([
+            blacklisttoken_model_1.default.create({ token }),
+            res.clearCookie("token"),
+        ]);
+        res.json({ message: "Captain logged out successfully and set offline" });
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error.message || "Logout failed" });
     }
 });
 exports.logout = logout;
 const profile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log(`Captain Profile GET Invoked`);
-        res.send(req.captain);
+        if (!req.captain) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+        res.json(req.captain);
     }
     catch (error) {
         res.status(500).json({ message: "Error while fetching profile" });
@@ -127,7 +153,10 @@ const profile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.profile = profile;
 const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log(`Captain Profile POST Invoked`);
+        if (!req.captain) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
         const { name, email, phone, vehicle } = req.body;
         const captain = yield captain_model_1.default.findById(req.captain._id);
         if (!captain) {
@@ -143,84 +172,66 @@ const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         if (vehicle)
             captain.vehicle = vehicle;
         yield captain.save();
-        const cleanCaptain = captain.toObject();
-        const { password: _ } = cleanCaptain, captainWithoutPassword = __rest(cleanCaptain, ["password"]);
+        const _a = captain.toObject(), { password: _ } = _a, captainWithoutPassword = __rest(_a, ["password"]);
         res.json({
             message: "Profile updated successfully",
             captain: captainWithoutPassword,
         });
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error.message || "Profile update failed" });
     }
 });
 exports.updateProfile = updateProfile;
 const toggleAvailability = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log(`Captain Toggle Availability Invoked`);
-        const captain = yield captain_model_1.default.findById(req.captain._id);
-        if (!captain) {
+        if (!req.captain) {
+            res.status(401).json({ message: "Unauthorized" });
+            return;
+        }
+        const updatedCaptain = yield captain_model_1.default.findByIdAndUpdate(req.captain._id, [{ $set: { isAvailable: { $not: "$isAvailable" } } }], // atomic toggle with aggregation pipeline update
+        { new: true });
+        if (!updatedCaptain) {
             res.status(404).json({ message: "Captain not found" });
             return;
         }
-        captain.isAvailable = !captain.isAvailable;
-        yield captain.save();
-        res.json({ isAvailable: captain.isAvailable });
+        res.json({ isAvailable: updatedCaptain.isAvailable });
     }
     catch (error) {
-        res.status(500).json({ message: error.message });
+        res
+            .status(500)
+            .json({ message: error.message || "Failed to toggle availability" });
     }
 });
 exports.toggleAvailability = toggleAvailability;
 const getAvailableCaptains = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    console.log(`Captain getAvailableCaptains invoked`);
     try {
-        const captains = yield captain_model_1.default.find({ isAvailable: true }).select("-password" // exclude password
-        );
-        res.status(200).json(captains);
+        const captains = yield captain_model_1.default
+            .find({ isAvailable: true })
+            .select("-password");
+        res.json(captains);
     }
     catch (error) {
-        console.error("Error fetching available captains:", error);
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: error.message || "Internal server error" });
     }
 });
 exports.getAvailableCaptains = getAvailableCaptains;
-const forwardToWebSocket = (captainId, event, data) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        yield axios_1.default.post(`${WEBSOCKET_SERVER_URL}/notify`, {
-            userId: captainId,
-            event,
-            data,
-        });
-    }
-    catch (err) {
-        console.error("Failed to send WebSocket message:", err.message);
-    }
-});
-// RabbitMQ subscriptions
-subscribeToQueue("ride-created", (msg) => __awaiter(void 0, void 0, void 0, function* () {
-    const data = JSON.parse(msg);
-    const { captainId } = data;
-    if (captainId) {
-        yield forwardToWebSocket(captainId, "ride-created", data);
-    }
-}));
-subscribeToQueue("ride-cancelled", (msg) => __awaiter(void 0, void 0, void 0, function* () {
-    const data = JSON.parse(msg);
-    const { captainId } = data;
-    if (captainId) {
-        yield forwardToWebSocket(captainId, "ride-cancelled", data);
-    }
-}));
 const getCaptainDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const captainId = req.params.id || req.query.id;
+        const captainId = ((_a = req.params) === null || _a === void 0 ? void 0 : _a.captainId) || req.query.captainId;
         if (!captainId) {
-            res.status(404).send("Captain ID required");
+            res.status(400).json({ message: "Captain ID required" });
             return;
         }
-        const captain = yield captain_model_1.default.findById(captainId);
-        res.send(captain);
+        const captain = yield captain_model_1.default
+            .findById(captainId)
+            .select("name phone vehicle");
+        if (!captain) {
+            res.status(404).json({ message: "Captain not found" });
+            return;
+        }
+        res.json(captain);
     }
     catch (err) {
         res
@@ -231,9 +242,8 @@ const getCaptainDetails = (req, res) => __awaiter(void 0, void 0, void 0, functi
 exports.getCaptainDetails = getCaptainDetails;
 const getAllRideRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log(`Captain GetAllRideRequests invoked`);
         const response = yield axios_1.default.get(`${BASE_URL}/api/ride/rides`);
-        const rides = response.data.rides;
+        const rides = response.data.rides || [];
         res.json({ rides });
     }
     catch (error) {
@@ -246,15 +256,13 @@ exports.getAllRideRequests = getAllRideRequests;
 const getRideHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log(`Captain Ride History Called`);
-        const captainId = (_a = req.captain) === null || _a === void 0 ? void 0 : _a._id;
-        if (!captainId) {
+        if (!((_a = req.captain) === null || _a === void 0 ? void 0 : _a._id)) {
             res.status(401).json({ message: "Unauthorized: Captain not found" });
             return;
         }
         const response = yield axios_1.default.post(`${BASE_URL}/api/ride/ride-history`, {
-            captainId,
-            status: "all", // <-- request body
+            captainId: req.captain._id,
+            status: RIDE_STATUS.ALL,
         }, {
             withCredentials: true,
             headers: {
@@ -262,14 +270,26 @@ const getRideHistory = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 "Content-Type": "application/json",
             },
         });
-        console.log(response);
         res.json(response.data);
     }
     catch (error) {
-        console.error("Error fetching captain ride history:", error);
         res
             .status(500)
             .json({ message: error.message || "Failed to fetch ride history" });
     }
 });
 exports.getRideHistory = getRideHistory;
+[EVENT_TYPES.RIDE_CREATED, EVENT_TYPES.RIDE_CANCELLED].forEach((event) => {
+    subscribeToQueue(event, (msg) => __awaiter(void 0, void 0, void 0, function* () {
+        try {
+            const data = JSON.parse(msg);
+            const captainId = data.captainId;
+            if (captainId) {
+                yield (0, notification_1.notifyUser)(captainId, event, data, "captain");
+            }
+        }
+        catch (err) {
+            console.log(`Something wrong happened on server: ${err.message}`);
+        }
+    }));
+});

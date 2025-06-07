@@ -159,7 +159,7 @@ export const profile = async (
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    res.json({ captain: req.captain });
+    res.json(req.captain);
   } catch (error: any) {
     res.status(500).json({ message: "Error while fetching profile" });
   }
@@ -238,7 +238,7 @@ export const getAvailableCaptains = async (
     const captains = await captainModel
       .find({ isAvailable: true })
       .select("-password");
-    res.json({ captains });
+    res.json(captains);
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Internal server error" });
   }
@@ -260,7 +260,7 @@ export const getCaptainDetails = async (req: CaptainRequest, res: Response) => {
       return;
     }
 
-    res.json({ captain });
+    res.json(captain);
   } catch (err: any) {
     res
       .status(500)

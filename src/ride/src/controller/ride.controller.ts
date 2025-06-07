@@ -43,10 +43,26 @@ export const createRide = async (
     });
 
     await newRide.save();
-    await publishToQueue(EVENT_TYPES.RIDE_CREATED, JSON.stringify(newRide));
-    await notifyUser(req.user._id, EVENT_TYPES.RIDE_CREATED, newRide, "user");
 
-    res.status(201).send(newRide);
+    const userInfo = await getUserById(req.user._id);
+    const enrichedRide = {
+      ...newRide.toObject(),
+      user: userInfo,
+      captain: null,
+    };
+
+    await publishToQueue(
+      EVENT_TYPES.RIDE_CREATED,
+      JSON.stringify(enrichedRide)
+    );
+    await notifyUser(
+      req.user._id,
+      EVENT_TYPES.RIDE_CREATED,
+      { ride: enrichedRide },
+      "user"
+    );
+
+    res.status(201).send(enrichedRide);
   } catch (error) {
     next(error);
   }
@@ -58,42 +74,50 @@ export const acceptRide = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    console.log("Captain info from request:", req.captain);
-    console.log("Request body: ", req.body);
     const rideId = req.body.rideId as string;
-    console.log(`AcceptRide invoked and ride id is: ${rideId}`);
+    const captainId = req.captain?._id;
+
     if (!rideId) {
       res.status(400).json({ message: "Ride ID is required" });
       return;
     }
 
-    if (!req.captain?._id) {
+    if (!captainId) {
       res.status(401).json({ message: "Unauthorized: Captain not found" });
       return;
     }
 
     const ride = await rideModel.findOneAndUpdate(
       { _id: rideId, status: "requested" },
-      { status: "accepted", captain: new Types.ObjectId(req.captain._id) },
+      { status: "accepted", captain: new Types.ObjectId(captainId) },
       { new: true }
     );
 
-    console.log(`Ride is ${ride}`);
     if (!ride) {
       res.status(409).json({ message: "Ride already accepted or unavailable" });
       return;
     }
 
-    publishToQueue(EVENT_TYPES.RIDE_ACCEPTED, JSON.stringify(ride));
+    const captainDetails = await getCaptainById(captainId);
+
+    const enrichedRide = {
+      ...ride.toObject(),
+      captain: {
+        name: captainDetails.name,
+        phone: captainDetails.phone,
+        vehicle: captainDetails.vehicle,
+      },
+    };
+
+    publishToQueue(EVENT_TYPES.RIDE_ACCEPTED, JSON.stringify(enrichedRide));
     await notifyUser(
       ride.user.toString(),
       EVENT_TYPES.RIDE_ACCEPTED,
-      ride,
+      { ride: enrichedRide },
       "user"
     );
-    // await notifyUser(req.captain._id, "ride-accepted", ride);
 
-    res.send(ride);
+    res.send(enrichedRide);
   } catch (error) {
     next(error);
   }
@@ -132,20 +156,38 @@ export const cancelRide = async (
       return;
     }
 
-    await publishToQueue(EVENT_TYPES.RIDE_CANCELLED, JSON.stringify(ride));
-    await notifyUser(req.user._id, EVENT_TYPES.RIDE_CANCELLED, ride, "user");
+    const userInfo = await getUserById(ride.user.toString());
+    const captainInfo = ride.captain
+      ? await getCaptainById(ride.captain.toString())
+      : null;
 
-    // Notify captain if assigned
+    const enrichedRide = {
+      ...ride.toObject(),
+      user: userInfo,
+      captain: captainInfo,
+    };
+
+    await publishToQueue(
+      EVENT_TYPES.RIDE_CANCELLED,
+      JSON.stringify(enrichedRide)
+    );
+    await notifyUser(
+      req.user._id,
+      EVENT_TYPES.RIDE_CANCELLED,
+      { ride: enrichedRide },
+      "user"
+    );
+
     if (ride.captain) {
       await notifyUser(
         ride.captain.toString(),
         EVENT_TYPES.RIDE_CANCELLED,
-        ride,
+        { ride: enrichedRide },
         "captain"
       );
     }
 
-    res.send({ message: "Ride cancelled successfully", ride });
+    res.send({ message: "Ride cancelled successfully", ride: enrichedRide });
   } catch (error) {
     next(error);
   }
@@ -157,9 +199,7 @@ export const startRide = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    console.log("Start ride invoked");
     const rideId = req.body.rideId as string;
-    console.log("Ride id from start ride:", rideId);
     if (!rideId) {
       res.status(400).json({ message: "Ride ID is required" });
       return;
@@ -185,16 +225,21 @@ export const startRide = async (
       return;
     }
 
-    publishToQueue(EVENT_TYPES.RIDE_STARTED, JSON.stringify(ride));
+    const captainDetails = await getCaptainById(req.captain._id);
+    const enrichedRide = {
+      ...ride.toObject(),
+      captain: captainDetails,
+    };
+
+    publishToQueue(EVENT_TYPES.RIDE_STARTED, JSON.stringify(enrichedRide));
     await notifyUser(
       ride.user.toString(),
       EVENT_TYPES.RIDE_STARTED,
-      ride,
+      { ride: enrichedRide },
       "user"
     );
-    // await notifyUser(req.captain._id, "ride-started", ride);
 
-    res.send(ride);
+    res.send(enrichedRide);
   } catch (error) {
     next(error);
   }
@@ -207,7 +252,6 @@ export const endRide = async (
 ): Promise<void> => {
   try {
     const rideId = req.body.rideId as string;
-
     if (!rideId) {
       res.status(400).json({ message: "Ride ID is required" });
       return;
@@ -233,16 +277,21 @@ export const endRide = async (
       return;
     }
 
-    publishToQueue(EVENT_TYPES.RIDE_COMPLETED, JSON.stringify(ride));
+    const captainDetails = await getCaptainById(req.captain._id);
+    const enrichedRide = {
+      ...ride.toObject(),
+      captain: captainDetails,
+    };
+
+    publishToQueue(EVENT_TYPES.RIDE_COMPLETED, JSON.stringify(enrichedRide));
     await notifyUser(
       ride.user.toString(),
       EVENT_TYPES.RIDE_COMPLETED,
-      ride,
+      { ride: enrichedRide },
       "user"
     );
-    // await notifyUser(req.captain._id, "ride-completed", ride);
 
-    res.send(ride);
+    res.send(enrichedRide);
   } catch (error) {
     next(error);
   }

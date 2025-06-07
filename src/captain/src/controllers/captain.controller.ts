@@ -221,7 +221,6 @@ export const isAvailable = async (
       return;
     }
 
-    console.log(captain.isAvailable);
     res.json(captain.isAvailable);
     return;
   } catch (error) {

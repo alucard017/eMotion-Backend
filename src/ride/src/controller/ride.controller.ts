@@ -336,12 +336,7 @@ export const getRide = async (
   res: Response
 ): Promise<void> => {
   try {
-    console.log("GetRide invoked");
     let { userId, captainId, status } = req.body;
-
-    console.log(
-      `Userid: ${userId}, CaptainId: ${captainId}, Status: ${status}`
-    );
     if (
       status &&
       status !== "all" &&
@@ -377,8 +372,6 @@ export const getRide = async (
     }
 
     const rides = await rideModel.find(query).sort({ createdAt: -1 });
-
-    console.log("Rides are : ", rides);
     const enrichedRides = await Promise.all(
       rides.map(async (ride) => {
         const userInfo = ride.user
@@ -396,7 +389,6 @@ export const getRide = async (
       })
     );
 
-    console.log("Enriched Rides are: ", enrichedRides);
     res.json({ rides: enrichedRides });
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Failed to fetch rides" });
@@ -424,7 +416,6 @@ export const getCurrentRide = async (
       res.json({ ride: null });
       return;
     }
-    console.log("Ride is: ", ride);
     const userInfo = ride?.user
       ? await getUserById(ride.user.toString())
       : null;
@@ -437,7 +428,7 @@ export const getCurrentRide = async (
       user: userInfo,
       captain: captainInfo,
     };
-    console.log("Enriched Ride: ", enrichedRide);
+
     res.json({
       ride: enrichedRide,
     });

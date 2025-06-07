@@ -1,6 +1,6 @@
 import express from "express";
 import * as captainController from "../controllers/captain.controller";
-import { captainAuth } from "../middleware/authMiddleWare";
+import { captainAuth } from "../middleware/auth.middleware";
 
 const router = express.Router();
 

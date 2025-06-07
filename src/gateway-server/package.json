@@ -1,9 +1,9 @@
 {
   "name": "gateway",
   "version": "1.0.0",
-  "main": "dist/app.js",
+  "main": "dist/server.js",
   "scripts": {
-    "dev": "tsc -b && node dist/app.js"
+    "dev": "tsc -b && node dist/server.js"
   },
   "keywords": [],
   "author": "",

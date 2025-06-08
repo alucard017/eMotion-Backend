@@ -11,6 +11,7 @@ app.use(
       "http://localhost:3000",
       "https://e-motion-eight.vercel.app/",
       "https://emotion-websocket-server.onrender.com",
+      "https://distros.tech",
     ],
     credentials: true,
   })
@@ -35,15 +36,15 @@ const captainLimiter = rateLimit({
 app.use(
   "/api/user",
   userLimiter,
-  expressProxy("https://emotion-user.onrender.com")
+  expressProxy("http://azureuser-user-service-1:8001")
 );
 app.use(
   "/api/captain",
   captainLimiter,
-  expressProxy("https://emotion-captain.onrender.com")
+  expressProxy("http://azureuser-captain-service-1:8002")
 );
 
-app.use("/api/ride", expressProxy("https://emotion-ride.onrender.com"));
+app.use("/api/ride", expressProxy("http://azureuser-ride-service-1:8003"));
 
 app.listen(8000, "0.0.0.0", () => {
   console.log("Gateway server listening on port 8000");

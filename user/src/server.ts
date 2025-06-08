@@ -18,9 +18,7 @@ app.use(
     origin: [
       "https://e-motion-eight.vercel.app/",
       "http://localhost:3001",
-      "https://emotion-ride.onrender.com",
-      "https://emotion-captain.onrender.com",
-      "https://emotion-websocket-server.onrender.com",
+      "https://distros.tech",
     ],
     credentials: true,
   })

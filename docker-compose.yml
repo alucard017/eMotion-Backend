@@ -1,7 +1,7 @@
 services:
   user-service:
     build:
-      context: ./user-service
+      context: ./eMotion-Backend/user
       dockerfile: Dockerfile
     ports:
       - "8001:8001"
@@ -10,13 +10,13 @@ services:
       - JWT_SECRET=user_secret
       - MONGO_URL=mongodb+srv://apurba007:Apurba%40123@learningcluster1.yhtlu.mongodb.net/eMotion-user
       - RABBIT_URL=amqps://kkflqoos:FCLIO17PM9QZLyfDHVhJM3T0otIG30H7@collie.lmq.cloudamqp.com/kkflqoos
-      - BASE_URL=http://20.2.82.109:8000
-      - WS_SERVER_URL=http://20.2.82.109:8080
+      - BASE_URL=http://distros.tech
+      - WS_SERVER_URL=http://distros.tech
     restart: unless-stopped
 
   captain-service:
     build:
-      context: ./captain
+      context: ./eMotion-Backend/captain
       dockerfile: Dockerfile
     ports:
       - "8002:8002"
@@ -25,13 +25,13 @@ services:
       - JWT_SECRET=captain_secret
       - MONGO_URL=mongodb+srv://apurba007:Apurba%40123@learningcluster1.yhtlu.mongodb.net/eMotion-captain
       - RABBIT_URL=amqps://kkflqoos:FCLIO17PM9QZLyfDHVhJM3T0otIG30H7@collie.lmq.cloudamqp.com/kkflqoos
-      - BASE_URL=http://20.2.82.109:8000
-      - WS_SERVER_URL=http://20.2.82.109:8080
+      - BASE_URL=http://distros.tech
+      - WS_SERVER_URL=http://distros.tech
     restart: unless-stopped
 
   ride-service:
     build:
-      context: ./ride
+      context: ./eMotion-Backend/ride
       dockerfile: Dockerfile
     ports:
       - "8003:8003"
@@ -41,13 +41,23 @@ services:
       - USER_SECRET=user_secret
       - MONGO_URL=mongodb+srv://apurba007:Apurba%40123@learningcluster1.yhtlu.mongodb.net/eMotion-ride
       - RABBIT_URL=amqps://kkflqoos:FCLIO17PM9QZLyfDHVhJM3T0otIG30H7@collie.lmq.cloudamqp.com/kkflqoos
-      - BASE_URL=http://20.2.82.109:8000
-      - WS_SERVER_URL=http://20.2.82.109:8080
+      - BASE_URL=http://distros.tech
+      - WS_SERVER_URL=http://distros.tech
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./eMotion-Backend/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=production
     restart: unless-stopped
 
   websocket-server:
     build:
-      context: ./websocket-server
+      context: ./eMotion-Backend/websocket-server
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
@@ -56,12 +66,13 @@ services:
       # Add other env vars here
     restart: unless-stopped
 
-  nginx:
-    image: nginx:latest
+  caddy:
+    image: caddy:latest
     ports:
-      - "8000:80"
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile
     depends_on:
       - user-service
       - captain-service

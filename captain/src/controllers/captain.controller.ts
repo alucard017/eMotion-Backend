@@ -8,7 +8,7 @@ import axios from "axios";
 import { notifyUser } from "../service/notification";
 
 const { subscribeToQueue } = rabbitMq;
-const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
+const RIDE_URL = process.env.RIDE_URL || "http://localhost:8000";
 
 const EVENT_TYPES = {
   RIDE_CREATED: "ride-created",
@@ -302,7 +302,7 @@ export const getAllRideRequests = async (
   res: Response
 ) => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/ride/rides`);
+    const response = await axios.get(`${RIDE_URL}/rides`);
     const rides = response.data.rides || [];
     res.json({ rides });
   } catch (error: any) {
@@ -323,7 +323,7 @@ export const getRideHistory = async (
     }
 
     const response = await axios.post(
-      `${BASE_URL}/api/ride/ride-history`,
+      `${RIDE_URL}/ride-history`,
       {
         captainId: req.captain._id,
         status: RIDE_STATUS.ALL,

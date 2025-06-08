@@ -6,8 +6,7 @@ import axios from "axios";
 import { notifyUser } from "../service/notification";
 
 const { publishToQueue } = rabbitMq;
-const USER_URL = process.env.USER_URL || "http://localhost:8001";
-const CAPTAIN_URL = process.env.CAPTAIN_URL || "http://localhost:8002";
+const BASE_URL = process.env.BASE_URL || "http://localhost:8000";
 interface AuthenticatedRequest extends Request {
   user?: { _id: string };
   captain?: { _id: string };
@@ -298,12 +297,14 @@ export const endRide = async (
 };
 
 export const getUserById = async (userId: any) => {
-  const { data } = await axios.get(`${USER_URL}/details/${userId}`);
+  const { data } = await axios.get(`${BASE_URL}/api/user/details/${userId}`);
   return { name: data.name, phone: data.phone };
 };
 
 export const getCaptainById = async (captainId: any) => {
-  const { data } = await axios.get(`${CAPTAIN_URL}/details/${captainId}`);
+  const { data } = await axios.get(
+    `${BASE_URL}/api/captain/details/${captainId}`
+  );
   return { name: data.name, phone: data.phone, vehicle: data.vehicle };
 };
 

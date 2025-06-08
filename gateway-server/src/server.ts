@@ -7,7 +7,11 @@ const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://e-motion-eight.vercel.app/"],
+    origin: [
+      "http://localhost:3000",
+      "https://e-motion-eight.vercel.app/",
+      "https://emotion-websocket-server.onrender.com",
+    ],
     credentials: true,
   })
 );
@@ -28,10 +32,18 @@ const captainLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use("/api/user", userLimiter, expressProxy("http://localhost:8001"));
-app.use("/api/captain", captainLimiter, expressProxy("http://localhost:8002"));
+app.use(
+  "/api/user",
+  userLimiter,
+  expressProxy("https://emotion-user.onrender.com")
+);
+app.use(
+  "/api/captain",
+  captainLimiter,
+  expressProxy("https://emotion-captain.onrender.com")
+);
 
-app.use("/api/ride", expressProxy("http://localhost:8003"));
+app.use("/api/ride", expressProxy("https://emotion-ride.onrender.com"));
 
 app.listen(8000, () => {
   console.log("Gateway server listening on port 8000");

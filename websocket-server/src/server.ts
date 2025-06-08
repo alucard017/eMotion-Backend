@@ -90,10 +90,10 @@ app.use(
     origin: [
       "https://e-motion-eight.vercel.app/",
       "http://localhost:3001",
-      "http://localhost:8003",
-      "http://localhost:8001",
-      "http://localhost:8000",
-      "http://localhost:8002",
+      "https://emotion-user.onrender.com",
+      "https://emotion-captain.onrender.com",
+      "https://emotion-ride.onrender.com",
+      "https://emotion-gateway.onrender.com",
     ],
     credentials: true,
   })

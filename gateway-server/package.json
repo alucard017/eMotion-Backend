@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsc -b && node dist/server.js"
+    "build": "tsc -p .",
+    "dev": "node dist/server.js"
   },
   "keywords": [],
   "author": "",

@@ -34,6 +34,6 @@ app.use("/", userRoutes);
 
 const server = http.createServer(app);
 
-server.listen(8001, () => {
+server.listen(8001, "0.0.0.0", () => {
   console.log("User service is running on port 8001");
 });

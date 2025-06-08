@@ -159,6 +159,6 @@ app.post("/notify", (req: any, res: any) => {
 
 server.on("request", app);
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`WebSocket + HTTP server running on port ${PORT}`);
 });

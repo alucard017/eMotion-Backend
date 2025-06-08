@@ -32,6 +32,6 @@ app.use("/", rideRoutes);
 
 const server = http.createServer(app);
 
-server.listen(8003, () => {
+server.listen(8003, "0.0.0.0", () => {
   console.log("Ride service is running on port 8003");
 });

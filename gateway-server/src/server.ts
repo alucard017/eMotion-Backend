@@ -45,6 +45,6 @@ app.use(
 
 app.use("/api/ride", expressProxy("https://emotion-ride.onrender.com"));
 
-app.listen(8000, () => {
+app.listen(8000, "0.0.0.0", () => {
   console.log("Gateway server listening on port 8000");
 });

@@ -30,6 +30,6 @@ app.use(
 app.use("/", captainRoutes);
 
 const server = http.createServer(app);
-server.listen(8002, () => {
+server.listen(8002, "0.0.0.0", () => {
   console.log("captain service is running on port 8002");
 });

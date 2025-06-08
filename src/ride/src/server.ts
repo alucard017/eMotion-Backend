@@ -15,6 +15,7 @@ rabbitMq.connect();
 app.use(
   cors({
     origin: [
+      "https://e-motion-eight.vercel.app/",
       "http://localhost:3001",
       "http://localhost:8001",
       "http://localhost:8002",

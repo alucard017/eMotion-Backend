@@ -3,7 +3,7 @@ import http from "http";
 import url from "url";
 import express from "express";
 import bodyParser from "body-parser";
-
+import cors from "cors";
 const PORT = 8080;
 
 const server = http.createServer();
@@ -85,7 +85,19 @@ wss.on("connection", (ws, req) => {
 
 const app = express();
 app.use(bodyParser.json());
-
+app.use(
+  cors({
+    origin: [
+      "https://e-motion-eight.vercel.app/",
+      "http://localhost:3001",
+      "http://localhost:8003",
+      "http://localhost:8001",
+      "http://localhost:8000",
+      "http://localhost:8002",
+    ],
+    credentials: true,
+  })
+);
 app.post("/notify", (req: any, res: any) => {
   const { userId, role, event, data } = req.body;
   console.log("[NOTIFY REQUEST]", { userId, role, event, data });

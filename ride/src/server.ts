@@ -27,8 +27,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// app.use("/", rideRoutes); //for gateway
-app.use("/api/ride/", rideRoutes);
+app.use("/", rideRoutes); //for gateway
+// app.use("/api/ride/", rideRoutes);
 
 const server = http.createServer(app);
 

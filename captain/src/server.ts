@@ -26,8 +26,8 @@ app.use(
     credentials: true,
   })
 );
-// app.use("/", captainRoutes); //for gateway
-app.use("/api/captain/", captainRoutes);
+app.use("/", captainRoutes); //for gateway
+// app.use("/api/captain/", captainRoutes);
 
 const server = http.createServer(app);
 server.listen(8002, "0.0.0.0", () => {

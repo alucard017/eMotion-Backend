@@ -35,17 +35,23 @@ const captainLimiter = rateLimit({
 
 app.use(
   "/api/user",
-  userLimiter,
-  expressProxy("http://azureuser-user-service-1:8001")
+  // userLimiter,
+  // expressProxy("http://azureuser-user-service-1:8001")
+  expressProxy("localhost:8001")
 );
 app.use(
   "/api/captain",
-  captainLimiter,
-  expressProxy("http://azureuser-captain-service-1:8002")
+  // captainLimiter,
+  // expressProxy("http://azureuser-captain-service-1:8002")
+  expressProxy("localhost:8002")
 );
 
-app.use("/api/ride", expressProxy("http://azureuser-ride-service-1:8003"));
+app.use(
+  "/api/ride",
+  // expressProxy("http://azureuser-ride-service-1:8003")
+  expressProxy("localhost:8003")
+);
 
-app.listen(8000, "0.0.0.0", () => {
-  console.log("Gateway server listening on port 8000");
+app.listen(8005, "0.0.0.0", () => {
+  console.log("Gateway server listening on port 8005");
 });

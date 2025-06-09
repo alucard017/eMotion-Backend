@@ -19,6 +19,7 @@ app.use(
       "https://e-motion-eight.vercel.app/",
       "http://localhost:3001",
       "https://distros.tech",
+      "http://distros.tech",
     ],
     credentials: true,
   })
@@ -28,7 +29,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use("/", userRoutes);
+app.use("/api/user/", userRoutes);
 
 const server = http.createServer(app);
 

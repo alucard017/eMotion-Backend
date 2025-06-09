@@ -21,11 +21,12 @@ app.use(
       "https://e-motion-eight.vercel.app/",
       "http://localhost:3001",
       "https://distros.tech",
+      "http://distros.tech",
     ],
     credentials: true,
   })
 );
-app.use("/", captainRoutes);
+app.use("/api/captain/", captainRoutes);
 
 const server = http.createServer(app);
 server.listen(8002, "0.0.0.0", () => {

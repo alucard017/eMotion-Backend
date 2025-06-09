@@ -7,11 +7,11 @@ services:
       - "8001:8001"
     environment:
       - NODE_ENV=production
-      - JWT_SECRET=user_secret
-      - MONGO_URL=mongodb+srv://apurba007:Apurba%40123@learningcluster1.yhtlu.mongodb.net/eMotion-user
-      - RABBIT_URL=amqps://kkflqoos:FCLIO17PM9QZLyfDHVhJM3T0otIG30H7@collie.lmq.cloudamqp.com/kkflqoos
-      - BASE_URL=http://distros.tech
-      - WS_SERVER_URL=http://distros.tech
+      - JWT_SECRET=your_jwt_secret_for_user_auth
+      - MONGO_URL=your_mongo_connection_string_user
+      - RABBIT_URL=your_rabbitmq_url
+      - BASE_URL=your_base_url
+      - WS_SERVER_URL=your_websocket_url
     restart: unless-stopped
 
   captain-service:
@@ -22,11 +22,11 @@ services:
       - "8002:8002"
     environment:
       - NODE_ENV=production
-      - JWT_SECRET=captain_secret
-      - MONGO_URL=mongodb+srv://apurba007:Apurba%40123@learningcluster1.yhtlu.mongodb.net/eMotion-captain
-      - RABBIT_URL=amqps://kkflqoos:FCLIO17PM9QZLyfDHVhJM3T0otIG30H7@collie.lmq.cloudamqp.com/kkflqoos
-      - BASE_URL=http://distros.tech
-      - WS_SERVER_URL=http://distros.tech
+      - JWT_SECRET=your_jwt_secret_for_captain_auth
+      - MONGO_URL=your_mongo_connection_string_captain
+      - RABBIT_URL=your_rabbitmq_url
+      - BASE_URL=your_base_url
+      - WS_SERVER_URL=your_websocket_url
     restart: unless-stopped
 
   ride-service:
@@ -37,12 +37,12 @@ services:
       - "8003:8003"
     environment:
       - NODE_ENV=production
-      - CAPTAIN_SECRET=captain_secret
-      - USER_SECRET=user_secret
-      - MONGO_URL=mongodb+srv://apurba007:Apurba%40123@learningcluster1.yhtlu.mongodb.net/eMotion-ride
-      - RABBIT_URL=amqps://kkflqoos:FCLIO17PM9QZLyfDHVhJM3T0otIG30H7@collie.lmq.cloudamqp.com/kkflqoos
-      - BASE_URL=http://distros.tech
-      - WS_SERVER_URL=http://distros.tech
+      - CAPTAIN_SECRET=your_jwt_secret_for_captain_auth
+      - USER_SECRET=your_jwt_secret_for_user_auth
+      - MONGO_URL=your_mongo_connection_string_ride
+      - RABBIT_URL=your_rabbitmq_url
+      - BASE_URL=your_base_url
+      - WS_SERVER_URL=your_websocket_url
     restart: unless-stopped
 
   websocket-server:

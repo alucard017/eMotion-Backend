@@ -26,6 +26,7 @@ app.use(
     credentials: true,
   })
 );
+// app.use("/", captainRoutes); //for gateway
 app.use("/api/captain/", captainRoutes);
 
 const server = http.createServer(app);

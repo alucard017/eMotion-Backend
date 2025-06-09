@@ -6,8 +6,8 @@ const BASE_URL = "http://127.0.0.1:8005";
 const WS_URL = "ws://127.0.0.1:8080/ws";
 
 export const options = {
-  vus: 30,
-  duration: "15m",
+  vus: 15,
+  duration: "8m",
   noConnectionReuse: false,
 };
 

@@ -1,0 +1,60 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: .\loadTest.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 15 max VUs, 8m30s max duration (incl. graceful stop):       
+              * default: 15 looping VUs for 8m0s (gracefulStop: 30s)
+
+█ TOTAL RESULTS
+
+    checks_total.......................: 393    0.768514/s
+    checks_succeeded...................: 73.79% 290 out of 393
+    checks_failed......................: 26.20% 103 out of 393
+
+    ✓ User login success
+    ✓ Captain login success
+    ✗ Ride created (201)
+      ↳  60% — ✓ 91 / ✗ 60
+    ✗ Ride accepted (200)
+      ↳  57% — ✓ 52 / ✗ 39
+    ✗ Ride started (200)
+      ↳  94% — ✓ 49 / ✗ 3
+    ✗ Ride ended (200)
+      ↳  97% — ✓ 48 / ✗ 1
+    ✓ History fetched (200)
+
+    HTTP
+    http_req_duration.......................................................: avg=17.71s min=57.55ms  med=1.92s  max=1m0s    p(90)=59.99s  p(95)=1m0s
+      { expected_response:true }............................................: avg=11.48s min=253.49ms med=1.78s  max=58.18s  p(90)=44.89s  p(95)=50.06s
+    http_req_failed.........................................................: 26.20% 103 out of 393
+    http_reqs...............................................................: 393    0.768514/s   
+
+    EXECUTION
+    iteration_duration......................................................: avg=48.25s min=13.01s   med=54.85s max=1m13s   p(90)=1m1s    p(95)=1m1s
+    iterations..............................................................: 151    0.295282/s   
+    vus.....................................................................: 2      min=0        
+  max=15
+    vus_max.................................................................: 15     min=15       
+  max=15
+
+    NETWORK
+    data_received...........................................................: 544 kB 1.1 kB/s     
+    data_sent...............................................................: 234 kB 458 B/s      
+
+    WEBSOCKET
+    ws_connecting...........................................................: avg=9.44ms min=1.13ms   med=3.64ms max=88.96ms p(90)=18.66ms p(95)=58.44ms
+    ws_session_duration.....................................................: avg=48.25s min=12.96s   med=54.85s max=1m13s   p(90)=1m1s    p(95)=1m1s
+    ws_sessions.............................................................: 306    0.598385/s   
+
+
+
+                                                                                                  
+running (8m31.4s), 00/15 VUs, 151 complete and 2 interrupted iterations                           
+default ✓ [======================================] 15 VUs  8m0s     
